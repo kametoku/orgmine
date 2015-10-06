@@ -1,0 +1,81 @@
+#+title: sample org-mode file for orgmine
+
+* Tasks 							       :tracker:
+  :PROPERTIES:
+  :om_tracker: 4:Task
+  :om_fixed_version: !*
+  :END:
+  - tickets which do not belong to any version.
+* Milestone							       :tracker:
+  :PROPERTIES:
+  :om_tracker: 8:Milestone
+  :END:
+  - tickets of the "Milestone" tracker.
+** [[redmine:issue/12][#12]] New Code Freeze						       :issue:
+   DEADLINE: <2015-09-30 Wed> SCHEDULED: <2015-09-30 Wed>
+   :PROPERTIES:
+   :om_id: 123
+   :om_tracker: 8:Milestone
+   :om_created_on: 2015-09-04T00:56:07Z
+   :om_updated_on: 2015-10-01T08:57:24Z
+   :om_status: 1:New
+   :om_start_date: [2015-09-30 Wed]
+   :om_due_date: [2015-09-30 Wed]
+   :om_done_ratio: 0
+   :om_project: 84:MyProject
+   :END:
+* [[redmine:version/2][V#2]] Coding							       :version:
+  DEADLINE: <2015-11-19 Thu>
+  :PROPERTIES:
+  :om_fixed_version: 2:Coding
+  :om_created_on: 2015-09-10T09:11:44Z
+  :om_updated_on: 2015-09-10T09:11:44Z
+  :om_status: open
+  :om_due_date: [2015-11-19 Thu]
+  :om_project: 84:MyProject
+  :END:
+** [[redmine:issue/22][#22]] New Implement wiki pages editing 			       :issue:
+   DEADLINE: <2015-11-13 Fri> SCHEDULED: <2015-11-11 Wed>
+   :PROPERTIES:
+   :Effort:   1.0h
+   :om_id:    22
+   :om_tracker: 4:Task
+   :om_created_on: 2015-09-10T09:12:04Z
+   :om_updated_on: 2015-09-10T09:13:28Z
+   :om_status: 1:New
+   :om_fixed_version: 2:Coding
+   :om_start_date: [2015-11-11 Wed]
+   :om_done_ratio: 0
+   :om_estimated_hours: 1.0
+   :om_project: 84:MyProject
+   :om_due_date: [2015-11-13 Fri]
+   :END:
+*** Description							       :description:
+    #+begin_src gfm
+      - orgmine-wiki-xxx
+      blab, blab, blab...
+    #+end_src
+*** Journals							       :journals:
+**** Journal [[redmine:issues/22#note-1][#22#note-1]] [2015-09-10 Thu 18:13] Tokuya Kameshima	       :journal:
+     :PROPERTIES:
+     :om_count: 1
+     :END:
+     :DETAILS:
+     - attr_start_date: "2015-09-10" -> "2015-11-11"
+     - attr_due_date: ADDED -> "2015-11-13"
+     :END:
+     #+begin_src gfm
+       Changed start date to 11/11 and due date to 11/13.
+     #+end_src
+* COMMENT ----------------------------------------------------------------------
+#+SEQ_TODO: New(n) Open(o) Resolved(r) Feedback(f) | Closed(c)
+#+TAGS: { UPDATE_ME(u) CREATE_ME(c) REFILE_ME(r) }
+#+TAGS: { project(p) tracker(t) version(v) issue(i) description(d) journals(J) journal(j) }
+#+COLUMNS: %50ITEM(Task) %9om_assigned_to(Assigned) %8om_tracker(Tracker) %5Effort(Est.){:} %CLOCKSUM(Clock) %SCHEDULED %DEADLINE %TAGS
+#+PROPERTY: om_server redmine
+#+PROPERTY: om_project 84:MyProject
+#+PROPERTY: om_assigned_to_ALL 1:Tokuya\ Kameshima 2:Pooh\ Winnie
+#+PROPERTY: om_done_ratio_ALL 0 10 20 30 40 50 60 70 80 90 100
+#+PROPERTY: om_trackers_ALL 1:Defect 4:Task 8:Minestone
+#+PROPERTY: om_cf_12_resolution_ALL fixed declined deferred obsolete documentation
+#+PROPERTY: om_me 1:Tokuya\ Kameshima
