@@ -17,7 +17,7 @@ Install these packages as well.
 ** Download and put orgmine.el to a directory in `load-path'.
 
 The latest version of =orgmine.el= is available from:
-https://github.com/kametoku/orgmine.git
+https://github.com/kametoku/orgmine
 
 ** Edit your ~/.emacs
 
@@ -163,7 +163,11 @@ The property =om_server= determines which server setting in
   ,#+COLUMNS: %50ITEM(Task) %9om_assigned_to(Assigned) %8om_tracker(Tracker) %5Effort(Est.){:} %CLOCKSUM(Clock) %SCHEDULED %DEADLINE %TAGS
 #+end_src
 
-*** 
+*** Project subtree
+
+*** Version subtree
+
+*** Tracker subtree
 
 #+begin_src org
   ,* Milestone                                                            :tracker:
@@ -188,3 +192,10 @@ The property =om_server= determines which server setting in
 * Customization
 
 #+SEQ_TODO: New(n) Open(o) Resolved(r) Feedback(f) | Closed(c)
+#+OPTIONS: ':nil *:t -:t ::t <:t H:3 \n:nil ^:{} arch:headline
+#+OPTIONS: author:nil c:nil creator:nil d:(not "LOGBOOK") date:t e:t
+#+OPTIONS: email:nil f:t inline:t num:nil p:nil pri:nil prop:nil
+#+OPTIONS: stat:t tags:nil tasks:t tex:t timestamp:t title:t toc:t
+#+OPTIONS: todo:t |:t
+#+SELECT_TAGS: export
+#+EXCLUDE_TAGS: noexport
