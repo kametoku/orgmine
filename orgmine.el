@@ -1422,7 +1422,9 @@ If the note block is not found, return nil."
 	 (end (cdr region)))
     (when details
       (org-back-to-heading t)
-      (org-end-of-meta-data-and-drawers)
+      (if (fboundp 'org-end-of-meta-data-and-drawers)
+	  (org-end-of-meta-data-and-drawers)
+	(org-end-of-meta-data t))
       (when orgmine-journal-details-drawer
 	(let* ((region (orgmine-journal-details-drawer-region beg end)))
 	  (if region
@@ -2243,7 +2245,9 @@ NB: the journal is not submitted to the server."
 	  (progn
 	    (if (re-search-forward org-block-regexp end t)
 		(org-previous-block 1)
-	      (org-end-of-meta-data-and-drawers)
+	      (if (fboundp 'org-end-of-meta-data-and-drawers)
+		  (org-end-of-meta-data-and-drawers)
+		(org-end-of-meta-data t))
 	      (forward-line -1)
 	      (orgmine-insert-note "\n" t))
 	    (message "new journal entry already exist."))
@@ -2286,7 +2290,9 @@ NB: the description is not submitted to the server."
 	    (if (re-search-forward org-block-regexp
 				   (cdr (orgmine-subtree-region)) t)
 		(org-previous-block 1)
-	      (org-end-of-meta-data-and-drawers)
+	      (if (fboundp 'org-end-of-meta-data-and-drawers)
+		  (org-end-of-meta-data-and-drawers)
+		(org-end-of-meta-data t))
 	      (if (bolp)
 		  (forward-line -1)
 		(move-beginning-of-line nil))
