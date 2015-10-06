@@ -30,7 +30,7 @@ https://github.com/kametoku/orgmine.git
 
 *** =org-link-abbrev-alist= settings
 
-If you prefer to visiting Redmine tickets by web broweser via the org
+If you prefer to visiting Redmine tickets by web browser via the org
 links, add the link abbreviations to =org-link-abbrev-alist= as follows:
 
 #+begin_src emacs-lisp
@@ -42,7 +42,7 @@ links, add the link abbreviations to =org-link-abbrev-alist= as follows:
 
 *** =orgmine-servers setting= settings
 
-Setup =orgmine-servers= for yor environments.
+Setup =orgmine-servers= for your environments.
 Prior to do this, please get the API key of the redmine REST API.
 
 #+begin_src emacs-lisp
@@ -94,7 +94,7 @@ This is up to the statuses of the Redmine.
 #+end_src
 
 - UPDATE_ME: locally updated entry and need to be submitted to the redmine.
-- CRAETE_ME: a new entry to be submitted to the redmine.
+- CREATE_ME: a new entry to be submitted to the redmine.
 - REFILE_ME: TBD
 
 #+begin_src org
@@ -140,7 +140,7 @@ This setting is a very important part of settings in the org-mode file.
   ,#+PROPERTY: om_project 1:MyProject
   ,#+PROPERTY: om_assigned_to_ALL  1:Tokuya\ Kameshima 2:Pooh\ Winnie
   ,#+PROPERTY: om_done_ratio_ALL 0 10 20 30 40 50 60 70 80 90 100
-  ,#+PROPERTY: om_tracker_ALL 1:Defect 4:Task 8:Minestone
+  ,#+PROPERTY: om_tracker_ALL 1:Defect 4:Task 8:Milestone
   ,#+PROPERTY: om_me 1:Tokuya\ Kameshima
   ,#+PROPERTY: om_cf_12_resolution_ALL fixed declined deferred obsolete documentation
 #+end_src
