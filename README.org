@@ -1,0 +1,190 @@
+#+title: orgmine mode - minor mode for org-mode with Redmine integration
+#+author: Tokuya Kameshima
+
+* About orgmine mode
+
+~orgmine-mode~ is a minor mode for org-mode with Redmine integration.
+
+* Getting started
+
+** Requirements
+
+=orgmine.el= depends on the following emacs lisp packages.
+Install these packages as well.
+- elmine
+- s
+
+** Download and put orgmine.el to a directory in `load-path'.
+
+The latest version of =orgmine.el= is available from:
+https://github.com/kametoku/orgmine.git
+
+** Edit your ~/.emacs
+
+#+begin_src emacs-lisp
+  (require 'orgmine)
+  (add-hook 'org-mode-hook
+            (lambda () (if (assoc "om_project" org-file-properties)
+                           (orgmine-mode))))
+#+end_src
+
+*** =org-link-abbrev-alist= settings
+
+If you prefer to visiting Redmine tickets by web broweser via the org
+links, add the link abbreviations to =org-link-abbrev-alist= as follows:
+
+#+begin_src emacs-lisp
+  (setq org-link-abbrev-alist
+        '(("redmine" . "http://redmine.example.com/")
+          ;;...
+	  ))
+#+end_src
+
+*** =orgmine-servers setting= settings
+
+Setup =orgmine-servers= for yor environments.
+Prior to do this, please get the API key of the redmine REST API.
+
+#+begin_src emacs-lisp
+  (setq orgmine-servers
+        '(("redmine"                      ; server name for this entry
+           (host . "http://redmine.example.com")
+           (api-key . "blabblabblab")
+           (issue-title-format . "[[redmine:issues/%{id}][#%{id}]] %{subject}")
+           (journal-title-format . "[[redmine:issues/%{id}#note-%{count}][V#%{id}-%{count}]] %{created_on} %{author}")
+           (version-title-format . "[[redmine:versions/%{id}][V#%{id}]] %{name}")
+           (tracker-title-format . "%{name}")
+           (project-title-format . "[[redmine:projects/%{identifier}][%{identifier}]] %{name}")
+           (user-name-format . "%{firstname} %{lastname}"))))
+#+end_src
+
+| Key                  | default                      | Description             |
+|----------------------+------------------------------+-------------------------|
+| host                 | elmine/host                  | URL of Redmine          |
+| api-key              | elmine/api-key               | API Key for the Redmine |
+| issue-title-format   | orgmine-issue-title-format   | Issue title format      |
+| journal-title-format | orgmine-journal-title-format | Journal title format    |
+| version-title-format | orgmine-version-title-format | Version title format    |
+| tracker-title-format | orgmine-tracker-title-format | Tracker title format    |
+| project-title-format | orgmine-project-title-format | Project title format    |
+| user-name-format     | orgmine-user-name-format     | User Name format        |
+| custom-fields        | NA                           | custom fields           |
+
+** A .org file at a glance
+
+The basic structure of org-mode file for orgmine minor mode is as follows:
+
+You can run M-x orgmine-insert-template to retrieve basic settings for
+orgmine mode.
+
+*** #+SEQ_TODO settings
+
+This is up to the statuses of the Redmine.
+
+#+begin_src org
+  ,#+SEQ_TODO: New(n) Open(o) Resolved(r) Feedback(f) | Closed(c)
+#+end_src
+
+*** #+TAGS settings
+
+=orgmine= determines the headline types by its tags.
+
+#+begin_src org
+  ,#+TAGS: { UPDATE_ME(u) CREATE_ME(c) REFILE_ME(r) }
+#+end_src
+
+- UPDATE_ME: locally updated entry and need to be submitted to the redmine.
+- CRAETE_ME: a new entry to be submitted to the redmine.
+- REFILE_ME: TBD
+
+#+begin_src org
+  ,#+TAGS: { om_project(p) om_tracker(t) om_version(v) om_issue(i) om_description(d) om_journals(J) om_journal(j) }
+#+end_src
+
+Also, the following tags specify the headline types.
+
+| Tag            | Description                                             |
+|----------------+---------------------------------------------------------|
+| om_project     | project entry                                           |
+| om_tracker     | tracker entry                                           |
+| om_version     | fixed version entry                                     |
+| om_issue       | issue entry                                             |
+| om_description | description entry of an issue or project                |
+| om_journals    | journals subtree entry that consists of journal entries |
+| om_journal     | journal entry of an issue                               |
+| om_attachment  | attachment entry of an issue                            |
+
+You can change the tag names by =orgmine-tags= variable.
+The following is an example of =orgmine-tags= setting.
+
+#+begin_src emacs-lisp
+  (setq orgmine-tags '((update-me . "UPDATE_ME")
+                       (create-me . "CREATE_ME")
+                       (project . "project")
+                       (tracker . "tracker")
+                       (version . "version")
+                       (issue . "issue")
+                       (description . "description")
+                       (journals . "journals")
+                       (journal . "journal")
+                       (attachments . "attachments")
+                       (wiki . "wiki")))
+#+end_src
+
+*** #+PROPERTY settings 
+
+This setting is a very important part of settings in the org-mode file.
+
+#+begin_src org
+  ,#+PROPERTY: om_server redmine
+  ,#+PROPERTY: om_project 1:MyProject
+  ,#+PROPERTY: om_assigned_to_ALL  1:Tokuya\ Kameshima 2:Pooh\ Winnie
+  ,#+PROPERTY: om_done_ratio_ALL 0 10 20 30 40 50 60 70 80 90 100
+  ,#+PROPERTY: om_tracker_ALL 1:Defect 4:Task 8:Minestone
+  ,#+PROPERTY: om_me 1:Tokuya\ Kameshima
+  ,#+PROPERTY: om_cf_12_resolution_ALL fixed declined deferred obsolete documentation
+#+end_src
+
+| Property           | Must | Description                                     |
+|--------------------+------+-------------------------------------------------|
+| om_server          | Must | redmine server name                             |
+| om_project         | Want | default project ID followed by ":" and its name |
+| om_assigned_to_ALL | Wish | users of the project                            |
+| om_done_ratio_ALL  | Wish | done_ratio values 0 to 100 stepped by 10        |
+| om_tracker_ALL     | Wish | tracker IDs with their names                    |
+| om_me              | Wish | my user ID followed by ":" and its name         | 
+
+The property =om_server= determines which server setting in
+=orgmine-server-list= should be used.
+
+*** #+COLUMNS settings (optional) 
+
+#+begin_src org
+  ,#+COLUMNS: %50ITEM(Task) %9om_assigned_to(Assigned) %8om_tracker(Tracker) %5Effort(Est.){:} %CLOCKSUM(Clock) %SCHEDULED %DEADLINE %TAGS
+#+end_src
+
+*** 
+
+#+begin_src org
+  ,* Milestone                                                            :tracker:
+    :PROPERTIES:
+    :om_tracker: 8:Milestone
+    :END:
+  ,** [[redmine:issue/1]] New Code Freeze                                 :issue:
+     DEADLINE: <2015-09-30 Wed> SCHEDULED: <2015-09-30 Wed>
+     :PROPERTIES:
+     :om_id: 123
+     :om_tracker: 8:Milestone
+     :om_created_on: 2015-09-04T00:56:07Z
+     :om_updated_on: 2015-10-01T08:57:24Z
+     :om_status: 1:New
+     :om_start_date: [2015-09-30 Wed]
+     :om_due_date: [2015-09-30 Wed]
+     :om_done_ratio: 0
+     :om_project: 84:VIS14.0SP1
+     :END:
+#+end_src
+
+* Customization
+
+#+SEQ_TODO: New(n) Open(o) Resolved(r) Feedback(f) | Closed(c)
