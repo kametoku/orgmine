@@ -165,6 +165,37 @@ The property =om_server= determines which server setting in
 
 *** Project subtree
 
+Now, you are ready to retrieve the entries from the redmine.
+In the orgmine buffer run M-x orgmine-insert-project (or press C-c m P),
+and you will be prompted to specify the project id to insert.
+Enter the project id and press enter key, and then =orgmine= retrieves
+the project properties and insert the project entry with the headline.
+
+The following is an example of the result.
+Notice the project properties are inserted as the entry's properties
+and the project description is inserted as a sub entry and quoted in src block.
+
+#+begin_src org
+  ,* SandBox ([[redmine:projects/sandbox]])
+    :PROPERTIES:
+    :om_project: 1:SandBox
+    :om_created_on: 2015-07-31T06:40:56Z
+    :om_updated_on: 2015-08-18T05:42:26Z
+    :om_status: 1
+    :om_identifier: sandbox
+    :END:
+  ,** Description                                                     :description:
+     ,#+begin_src gfm
+       This is a sandbox project. Feel free to use the project.
+     ,#+end_src
+#+end_src
+
+**** Retrieving issues
+
+Move the cursor on the line of project headline and run
+M-x orgmine-sync-subtree-recursively (C-c m s) to retrieve all the issues
+of the project.
+
 *** Version subtree
 
 *** Tracker subtree
