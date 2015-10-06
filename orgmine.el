@@ -23,7 +23,7 @@
 ;; - [ ] orgmine-y-or-n permits scroll the plist buffer.
 ;; - [ ] a command to show properties of the current entry in other window.
 ;; - [X] do not delete Journals tree when updating the issue entry.
-;; - [ ] do not delete the issue headline when updating.
+;; - [X] do not delete the issue headline when updating.
 
 (require 'elmine)
 (require 's)
@@ -360,8 +360,8 @@ plist of PARAMS for the query."
 
 (defun orgmine-setup ()
   "Setup buffer local variables from ORGMINE-SERVERS per om_server property."
-  (let* ((server (cdr (assoc "om_server" org-file-properties)))
-	 (config (cdr (assoc server orgmine-servers))))
+  (let* ((server (cdr (assoc-string "om_server" org-file-properties t)))
+	 (config (cdr (assoc-string server orgmine-servers t))))
     (if config
 	(set (make-local-variable 'orgmine-server) server))
     (mapc (lambda (elem)
@@ -1014,7 +1014,8 @@ from the headline property drawer."
 	      (if (and plist
 		       (not (orgmine-plist-list-get custom-fields
 						    :id (plist-get plist :id))))
-		  (let* ((props (cdr (assoc name orgmine-custom-fields)))
+		  (let* ((props (cdr (assoc-string name orgmine-custom-fields
+						   t)))
 			 (value (cdr property)))
 		    (if (plist-get props :multiple)
 			(setq value (mapcar 'org-entry-restore-space
@@ -1110,7 +1111,7 @@ from the headline property drawer."
 			(org-entry-get pom name inherit))
 ;; 		    (or properties
 ;; 			(setq properties (orgmine-entry-properties pom 'all)))
-		    (cdr (assoc name properties)))))
+		    (cdr (assoc-string name properties t)))))
       (if value
 	  (let ((redmine-value
 		 (cond (id-property-p
@@ -1649,6 +1650,22 @@ Otherwise, new tree will be inserted at BEG."
       (plist-get plist :notes)	     ; XXX: for issue only
       (plist-get plist :attachments)))	; XXX: for issue only
 
+(defun orgmine-update-title (title)
+  "Update the title of the current headline."
+  (unless (org-at-heading-p) (error "not on heading"))
+  (save-excursion
+    (let* ((org-special-ctrl-a/e t)
+	   (beg (progn (move-beginning-of-line nil)
+		       (org-beginning-of-line)
+		       (point)))
+	   (end (progn (move-end-of-line nil)
+		       (org-end-of-line)
+		       (point))))
+      (if (< beg end)
+	  (delete-region beg end))
+      (goto-char beg)
+      (insert title))))
+
 (defun orgmine-update-entry (type entry plist
 				  &optional force property-list extra)
   "Update ENTRY (org-element data) of TYPE per PLIST.
@@ -1674,15 +1691,12 @@ Returns non-nil if the entry is  updated."
 	  (error "#%s is locally edited.  Please submit change before updating."
 		 idname))
       (message "Updating entry #%s ..." idname)
-      (org-element-put-property entry :title title)
       (org-with-wide-buffer
        (goto-char beg)
        (let ((end (make-marker)))
 	 (set-marker end (cdr (orgmine-subtree-region)))
 	 (show-subtree)
-	 (delete-region beg (progn (forward-line 1) (point)))
-	 (insert (org-element-normalize-string
-		  (org-element-interpret-data entry)))
+	 (orgmine-update-title title)
 	 (goto-char beg)
 	 (org-toggle-tag orgmine-tag-update-me 'off)
 	 (orgmine-set-properties type plist property-list)
@@ -1949,9 +1963,10 @@ return the issue number of the current entry."
 		    default-prop)))
     (if (member property keys)
 	property
-      (or (cdr (assoc (downcase property)
-		      (mapcar (lambda (x) (cons (downcase x) x))
-			      keys)))
+;;       (or (cdr (assoc (downcase property)
+;; 		      (mapcar (lambda (x) (cons (downcase x) x))
+;; 			      keys)))
+      (or (cdr (assoc-string property keys t))
 	  property))))
 
 ;;;;
@@ -2384,7 +2399,8 @@ The following version entries are not inserted:
     (unless redmine-project
       (error "Project #%s does not exist on Redmine or some error occurred."
 	     project))
-    (org-insert-heading arg)
+;;     (org-insert-heading arg)
+    (outline-insert-heading)
     (org-toggle-tag orgmine-tag-project 'on)
     (org-set-property "om_project" project)
     (let ((project (org-element-at-point)))
