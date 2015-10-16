@@ -109,21 +109,21 @@ This is up to the statuses of the Redmine.
 - REFILE_ME: TBD
 
 #+begin_src org
-  ,#+TAGS: { om_project(p) om_tracker(t) om_version(v) om_issue(i) om_description(d) om_journals(J) om_journal(j) }
+  ,#+TAGS: { project(p) tracker(t) version(v) issue(i) description(d) journals(J) journal(j) }
 #+end_src
 
 Also, the following tags specify the headline types.
 
-| Tag            | Description                                             |
-|----------------+---------------------------------------------------------|
-| om_project     | project entry                                           |
-| om_tracker     | tracker entry                                           |
-| om_version     | fixed version entry                                     |
-| om_issue       | issue entry                                             |
-| om_description | description entry of an issue or project                |
-| om_journals    | journals subtree entry that consists of journal entries |
-| om_journal     | journal entry of an issue                               |
-| om_attachment  | attachment entry of an issue                            |
+| Tag         | Description                                             |
+|-------------+---------------------------------------------------------|
+| project     | project entry                                           |
+| tracker     | tracker entry                                           |
+| version     | fixed version entry                                     |
+| issue       | issue entry                                             |
+| description | description entry of an issue or project                |
+| journals    | journals subtree entry that consists of journal entries |
+| journal     | journal entry of an issue                               |
+| attachment  | attachment entry of an issue                            |
 
 You can change the tag names by =orgmine-tags= variable.
 The following is an example of =orgmine-tags= setting.

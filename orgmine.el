@@ -97,17 +97,17 @@
   "")
 
 (defcustom orgmine-tags
-  '((update-me . "om_update_me")
-    (create-me . "om_create_me")
-    (project . "om_project")
-    (tracker . "om_tracker")
-    (version . "om_version")
-    (issue . "om_issue")
-    (description . "om_description")
-    (journals . "om_journals")
-    (journal . "om_journal")
-    (attachments . "om_attachments")
-    (wiki . "om_wiki"))
+  '((update-me . "UPDATE_ME")
+    (create-me . "CREATE_ME")
+    (project . "project")
+    (tracker . "tracker")
+    (version . "version")
+    (issue . "issue")
+    (description . "description")
+    (journals . "journals")
+    (journal . "journal")
+    (attachments . "attachments")
+    (wiki . "wiki"))
   "Alist of tags which are used in orgmine mode.")
 
 (defvar orgmine-tag-update-me)
@@ -612,7 +612,7 @@ If not found and NO-ERROR, return nil.  Otherwise, raise an error."
 	  (org-element-property :value src-block))))))
 
 (defun orgmine-um-headline (beg end tag)
-  "return headlines with :om_update_me: tag."
+  "return headlines with :UPDATE_ME: tag."
   (save-excursion
     (goto-char beg)
     (let ((headline))
@@ -630,7 +630,7 @@ If not found and NO-ERROR, return nil.  Otherwise, raise an error."
 		     (member orgmine-tag-tracker tags)
 		     (member orgmine-tag-project tags)
 		     (member orgmine-tag-wiki tags))) ; just ignore
-		(t (error "invalid headline %s for :om_update_me: tag." tag))))
+		(t (error "invalid headline %s for :UPDATE_ME: tag." tag))))
 ;; 	(outline-next-heading))
 	(outline-get-next-sibling))
       headline)))
@@ -670,7 +670,7 @@ Return list of plist (:path PATH :filename FILENAME :description DESCRIPTION)."
 	attachments))))
 
 (defun orgmine-um-headlines (beg end)
-  "return headlines with :om_update_me: tag.
+  "return headlines with :UPDATE_ME: tag.
 Return value: (DESCRIPTION JOURNAL ATTACHMENTS)"
   (save-excursion
     (let* ((description (orgmine-um-headline beg end orgmine-tag-description))
