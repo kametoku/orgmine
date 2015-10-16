@@ -1,15 +1,34 @@
 ;;; orgmine.el --- minor mode for org-mode with redmine integration
 
-;; Author: Tokuya Kameshima <kames at fa2 dot so-net dot ne dot jp>
-;; Keywords: TBD
-;; Homepage: TBD
+;; Copyright (C) 2015 Tokuya Kameshima
 
-;; https://github.com/kametoku/orgmine
+;; Author: Tokuya Kameshima <kametoku at gmail dot com>
+;; Keywords: outlines, hypermedia, calendar, wp
+;; Homepage: http://github.com/kametoku/orgmine
 
-;; - [X] do not set marker to nil.  Ensure 'end' is not nil before setting
-;;   marker. Otherwise, raise an error like not an issue entry.
-;; - [X] use marker if the end point may change while the end is alive.
-;; - [X] implement orgmine-sync-buffer
+;; This file is not part of GNU Emacs.
+;;
+;; This program is free software; you can redistribute it and/or
+;; modify it under the terms of the GNU General Public License
+;; as published by the Free Software Foundation; either version 3
+;; of the License, or (at your option) any later version.
+;;
+;; This program is distributed in the hope that it will be useful,
+;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;; GNU General Public License for more details.
+;;
+;; You should have received a copy of the GNU General Public License
+;; along with GNU Emacs; see the file COPYING.  If not, write to the
+;; Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
+;; Boston, MA 02110-1301, USA.
+
+;;; Commentary:
+
+;; orgmine is a minor mode for org-mode with Redmine integration.
+;; In a orgmine-mode buffer, you can retrieve the issues from Redmine,
+;; edit the entries of local, and submit the changes to Redmine.
+
 ;; - [ ] implement orgmine-copy-issue to push an issue tree to clipboard
 ;;   so that it will be inserted into the buffer as a new issue.
 ;; - [ ] suppress adding TODO keyword to headlines without :issue: tag. If
@@ -22,8 +41,8 @@
 ;; - [ ] more supports for custom fields.
 ;; - [ ] orgmine-y-or-n permits scroll the plist buffer.
 ;; - [ ] a command to show properties of the current entry in other window.
-;; - [X] do not delete Journals tree when updating the issue entry.
-;; - [X] do not delete the issue headline when updating.
+
+;;; Code:
 
 (require 'elmine)
 (require 's)
@@ -66,8 +85,6 @@
 (defcustom orgmine-attachment-format
   (concat "[[%{content_url}][%{filename}]] (%{filesize} bytes)"
 	  " %{author.name} %{created_on}")
-;;   "%{id}: %{created_on} [[%{content_url}][%{filename}]] (%{filesize} bytes) %{author.name}"
-;;   "%{created_on} [[%{content_url}][%{filename}]] %{author.name}"
   "attachment item format.")
 
 (defcustom orgmine-journal-details-drawer "DETAILS"
@@ -312,28 +329,6 @@ plist of PARAMS for the query."
 (defalias 'elmine/delete-wiki-page 'orgmine/delete-wiki-page)
 
 
-;;;
-;; (setq elmine/host "http://localhost:8080/redmine")
-;; (setq elmine/api-key "...")
-;;
-;; (elmine/get-projects)
-;;   => ((:updated_on "2015-07-31T06:40:56Z" :created_on "2015-07-31T06:40:56Z"
-;;        :status 1 :description "" :identifier "sandbox" :name "sandbox"
-;;        :id 1))
-;; (elmine/get-issues)
-;;
-;; (elmine/get-issue 1 :include)
-;;;
-
-;; (defvar orgmine-properties
-;;   '())
-
-;; (defvar orgmine-tags
-;;   '())
-
-
-;; (defvar orgmine-custom-fields)
-
 (defun orgmine-tag (key)
   "Return tag."
   (cdr (assoc key orgmine-tags)))
@@ -445,9 +440,6 @@ plist of PARAMS for the query."
   )
 
 
-;; (defun orgmine-properties ()
-;; )
-
 (defun orgmine-insert-demoted-heading (&optional title tags-list)
   (if (save-excursion
 	(save-match-data
@@ -524,41 +516,6 @@ plist of PARAMS for the query."
 	(match-string 1 title)
       title)))
 
-;; (orgmine-org-date "2015-03-22")
-
-;; (defun orgmine-find-entry-ancestor (type tag)
-;;   (let (element)
-;;     (catch 'found
-;;       (while (not found)
-;; 	(setq element (org-element-at-point))
-;; 	(if (and (eq (car element) type)
-;; 		 (member tag (plist-get (car (cdr element)) :tags)))
-;; 	    (throw 'found element))
-;;     element))
-
-;; (defun orgmine-find-headline (tag &optional end only-same-level)
-;;   "Search forward from point for headline with TAG
-;; within the region between the current position and END.
-;; If found, returns the org-element of the headline.
-
-;; NB: If the current position is on the head line,
-;; it searchs for the child headlines only."
-;;   (or end (setq end (point-max)))
-;;   (save-excursion
-;;     (let* ((element (org-element-at-point))
-;; 	   (level (and only-same-level
-;; 		       (org-element-property :level element))))
-;;       (unless (eq (org-element-type (org-element-at-point)) 'headline)
-;; 	(outline-previous-heading))
-;;       (catch 'found
-;; 	(while (< (point) end)
-;; 	  (let ((element (org-element-at-point)))
-;; 	    (if (and (or (not level)
-;; 			 (eq (org-element-property :level element) (1+ level)))
-;; 		     (member tag (org-element-property :tags element)))
-;; 		(throw 'found element)))
-;; 	  (outline-next-heading))
-;; 	nil))))
 (defun orgmine-map-region (func beg end &optional only-same-level)
   "Call FUNC for every heading between BEG and END."
   (let ((next-heading-func
@@ -600,29 +557,10 @@ If found, returns the beginning position of the headline."
 		nil)))
     (if pos (goto-char pos))))
 
-;; (defun orgmine-find-headline-prop (tag key value &optional end only-same-level)
-;;   "Search forward from point for headline with TAG and property of KEY = VALUE.
-;; within the region between the current position and END.
-;; If found, returns the org-element of the headline."
-;;   (let ((pos (catch 'found
-;; 	       (orgmine-map-region
-;; 		(lambda ()
-;; 		  (if (and (member tag (org-get-tags))
-;; ;; 			   (equal value (org-entry-get nil key)))
-;; 			   (message "DEBUG: %s"
-;; 				    (orgmine-get-property nil key)) ; XXX
-;; 			   (equal (nth 1 (orgmine-get-property nil key)) value))
-;; 		      (throw 'found (point))))
-;; 		(point) (or end (point-max)) only-same-level)
-;; 	       nil)))
-;;     (if pos (goto-char pos))))
-;; (defun orgmine-find-headline-prop (tag key value &optional end only-same-level)
 (defun orgmine-find-headline-prop (tag key value &optional end)
   "Search forward from point for headline with TAG and property of KEY is VALUE.
 within the region between the current position and END.
 If found, returns the beginning position of the headline."
-;;   (if (>= (point) end)
-;;       nil
     (let* ((value-regexp (if (orgmine-id-property-p key)
 			     (format "%s\\(:?:.*\\)?" (regexp-quote value))
 			   (regexp-quote value)))
@@ -735,8 +673,6 @@ Return list of plist (:path PATH :filename FILENAME :description DESCRIPTION)."
   "return headlines with :om_update_me: tag.
 Return value: (DESCRIPTION JOURNAL ATTACHMENTS)"
   (save-excursion
-;;     (let* ((description (orgmine-um-headline (goto-char beg) end
-;; 					     orgmine-tag-description))
     (let* ((description (orgmine-um-headline beg end orgmine-tag-description))
 	   (attachments (orgmine-parse-attachments-plain-list
 			 (orgmine-um-headline beg end orgmine-tag-attachments)))
@@ -748,44 +684,7 @@ Return value: (DESCRIPTION JOURNAL ATTACHMENTS)"
 			 (org-goto-first-child)
 			 (orgmine-um-headline (point) end
 					      orgmine-tag-journal))))
-;;       (cons description journal))))
       (list description journal attachments))))
-
-;; (defun orgmine-um-headlines (beg end)
-;;   "return headlines with :om_update_me: tag.
-;; Return value: (DESCRIPTION . JOURNAL)"
-;;   (save-excursion
-;;     (goto-char beg)
-;;     (let (description journal)
-;; ;;       (while (orgmine-find-headline orgmine-tag-update-me end nil)
-;;       (while (orgmine-find-headline orgmine-tag-update-me end t)
-;; 	(let ((tags (org-get-tags)))
-;; 	  (cond
-;; 	   ((member orgmine-tag-description tags)
-;; 	    (if description
-;; 		(error "More than one description headlines for an issue.")
-;; 	      (setq description (org-element-at-point))))
-;; 	   ((member orgmine-tag-journal tags)
-;; 	    (if journal
-;; 		(error "More than one journal headlines for an issue.")
-;; 	      (setq journal (org-element-at-point))))
-;; 	   ((member orgmine-tag-issue tags)) ; just ignore
-;; 	   ((member orgmine-tag-version tags)) ; just ignore
-;; 	   ((member orgmine-tag-tracker tags)) ; just ignore
-;; 	   ((member orgmine-tag-project tags)) ; just ignore
-;; 	   (t
-;; 	    (error "invalid headline for :om_update_me: tag."))))
-;; ;; 	(outline-next-heading))
-;; 	(outline-get-next-sibling))
-;;       (cons description journal))))
-
-;; (defun orgmine-issue-version-id ()
-;;   (let ((version (orgmine-find-headline-ancestor orgmine-tag-version)))
-;;     (if version
-;; 	(let* ((properties (org-entry-properties))
-;; 	       ))
-;;       ;; issue
-;;       )))
 
 (defun orgmine-current-issue-heading (&optional no-error)
   "Move to the beginning of the current issue headline."
@@ -812,10 +711,6 @@ or move to current issuen headline."
   "Convert Redmine REST API property name to org-mode property name."
   (format "om_%s" key))
 
-;; (defun orgmine-property-symbol (key)
-;;   "Convert Redmine REST API property name to "
-;;   (intern (format ":%s" key))
-
 (defun orgmine-name (plist &optional format escape)
   (let ((name (if format
 		  (orgmine-format format plist)
@@ -831,20 +726,6 @@ or move to current issuen headline."
     (if name
 	(format "%s:%s" id name)
       (elmine/ensure-string id))))
-
-;; (defun orgmine-idname (plist &optional format escape)
-;;   ;; plist -> "ID:NAME"
-;; ;;   (format "%s:%s" (plist-get plist :id) (or (plist-get plist :name) "")))
-;;   (let ((id (plist-get plist :id))
-;; 	(name (if format
-;; 		  (orgmine-format format plist)
-;; 		(plist-get plist :name))))
-;;     (if name
-;; 	(let ((idname (format "%s:%s" id name)))
-;; 	  (if escape
-;; 	      (replace-regexp-in-string " " "\\\\ " idname)
-;; 	    idname))
-;;       (elmine/ensure-string id))))
 
 (defun orgmine-delete-properties (pom regexp)
   "Delete entry properties at POM which match REGEXP."
@@ -872,13 +753,6 @@ or move to current issuen headline."
 (defun orgmine-set-properties-custom-fields (custom-fields)
   ;; ((:value \"3\" :name \"Owner\" :id 1))
   ;; erase "oc_cf_*" properties.
-;;   (let ((properties (orgmine-entry-properties nil 'all)))
-;;     (save-match-data
-;;       (mapc (lambda (prop)
-;; 	      (let ((property (car prop)))
-;; 		(if (string-match "^om_cf_" property)
-;; 		    (org-delete-property property))))
-;; 	    properties)))
   (orgmine-delete-properties nil "^om_cf_")
   (mapc (lambda (cf-plist)
 	  (let* ((name (orgmine-custom-field-property-name cf-plist))
@@ -991,10 +865,6 @@ Only the properties provided in PROPERTY-LIST are updated."
 a plist of (:id ID :name NAME)."
   (memq property orgmine-id-properties))
 
-;; (defvar orgmine-date-properties '(start_date due_date))
-
-;; (org-entry-get nil "om_fixed_version")
-
 (defun orgmine-entry-properties (&optional pom which)
   "Workaround for old `org-entry-properties' that cannot get properties
 from the headline property drawer."
@@ -1035,9 +905,6 @@ from the headline property drawer."
   ;; "444" -> (:issue_to_id 444)
   (save-excursion
     (if (string-match "^\\([0-9]+\\)\\(?:/d\\([0-9]+\\)\\)?" value)
-;; 	(let* ((issue-to-id (match-string 1 value))
-;; 	       (delay (match-string 2 value))
-;; 	       (plist (list :issue_to_id issue-to-id)))
 	(let* ((other-id (match-string 1 value))
 	       (delay (match-string 2 value))
 	       (plist (cond ((null my-id)
@@ -1068,27 +935,6 @@ from the headline property drawer."
 ;; 	;; list of plist as alist.
 ;; 	(add-to-list 'relations nil t))
     relations))
-;; (defun orgmine-get-property-relations (pom &optional properties)
-;;   (or properties
-;;       (setq properties (orgmine-entry-properties pom 'all)))
-;;   (let (relations)
-;;     (mapc (lambda (property)
-;; 	    (let* ((name (car property))
-;; 		   (plist (orgmine-relation-plist name)))
-;; 	      (if plist
-;; 		  (let ((values (org-entry-get-multivalued-property pom name)))
-;; 		    (mapc (lambda (value)
-;; 			    (let ((plist (copy-sequence plist))
-;; 				  (value-plist
-;; 				   (orgmine-relation-value-plist value)))
-;; 			      (add-to-list 'relations
-;; 					   (nconc plist value-plist))))
-;; 			  values)))))
-;; 	  properties)
-;;     (if relations
-;; 	;; workaround for `json-enconde-list', which wrongly handles
-;; 	;; list of plist as alist.
-;; 	(add-to-list 'relations nil t))))
 
 (defun orgmine-get-property (pom property
 				 &optional properties inherit for-filter)
@@ -1139,30 +985,6 @@ Only the properties given by PROPERTY-LIST are retrieved."
   (let* ((plist (orgmine-get-property pom id-prop properties))
 	 (id (nth 1 plist)))
     id))
-
-;; (defun orgmine-get-properties (pom property-list &optional inherit)
-;;   "Get properties from the headline at point-or-maker POM.
-;; Only the properties given by PROPERTY-LIST are retrieved."
-;;   (let ((properties (unless inherit (org-entry-properties pom)))
-;; 	plist)
-;;     (mapc (lambda (prop)
-;; 	    (let* ((name (orgmine-property-name prop)) ; om_id and so on
-;; 		   (id-property-p (memq prop orgmine-id-properties))
-;; 		   (prop (intern (format (if id-property-p ":%s_id" ":%s")
-;; 					 prop)))
-;; 		   (value (if inherit
-;; 			      (org-entry-get pom name)
-;; 			    (cdr (assoc name properties)))))
-;; 	      (if value
-;; 		  (let ((redmine-value
-;; 			 (cond (id-property-p
-;; 				(orgmine-idname-to-id value))
-;; 			       ((member prop '(:start_date :due_date))
-;; 				(orgmine-redmine-date value))
-;; 			       (t value))))
-;; 		    (setq plist (plist-put plist prop redmine-value))))))
-;; 	  property-list)
-;;     plist))
 
 (defvar orgmine-statuses)
 
@@ -1225,26 +1047,6 @@ Only the properties given by PROPERTY-LIST are retrieved."
 ;; 		       estimated_hours custom_fields) nil)))
 		       estimated_hours custom_fields relations) nil)))
        (setq plist (plist-merge plist plist-inherit))
-;;        (if title
-;; 	   (nconc plist			; `subject-prop': :subject or :name
-;; 		  (list subject-prop (orgmine-extract-subject title))))
-;;        (if todo-keyword
-;; 	   (let ((status-id (orgmine-issue-status-id todo-keyword)))
-;; 	     (nconc plist (list :status_id status-id))))
-;;        (if scheduled
-;; 	   (nconc plist
-;; 		  (list :start_date (orgmine-redmine-date scheduled))))
-;;        (if deadline
-;; 	   (nconc plist
-;; 		  (list :due_date (orgmine-redmine-date deadline))))
-;;        (if effort
-;; 	   (nconc plist
-;; 		  (list :estimated_hours
-;; 			(/ (org-duration-string-to-minutes effort) 60))))
-;;        (if description
-;; 	   (nconc plist (list :description (orgmine-note description))))
-;;        (if journal
-;; 	   (nconc plist (list :notes (orgmine-note journal))))
        (if title
 	   (setq plist			; `subject-prop': :subject or :name
 		 (plist-put plist subject-prop
@@ -1489,18 +1291,6 @@ If the note block is not found, return nil."
     (orgmine-insert-journal-details journal)
 ;;     (orgmine-set-properties 'journal journal '(id count created_on user))
     (orgmine-set-properties 'journal journal '(count))))
-;; (defun orgmine-insert-journal (journal issue-id count &optional force)
-;;   (let* ((author (plist-get (plist-get journal :user) :name))
-;; 	 (journal-id (plist-get journal :id))
-;; 	 (journal (plist-merge journal
-;; 			       (list :id issue-id :count count
-;; 				     :author author :journal_id journal-id)))
-;; 	 (title (orgmine-format orgmine-journal-title-format journal)))
-;;     (orgmine-insert-demoted-heading title (list orgmine-tag-journal))
-;;     (orgmine-insert-journal-details journal)
-;;     (orgmine-insert-note (plist-get journal :notes) force)
-;; ;;     (orgmine-set-properties 'journal journal '(id count created_on user))))
-;;     (orgmine-set-properties 'journal journal '(count))))
 
 (defun orgmine-find-journals (end &optional insert keep-subtree)
   "Find journals headline of the child entry of the current headline.
@@ -1847,16 +1637,6 @@ Will you force to update entry #%s? %s" id id plist))
 (defvar orgmine-project-versions nil)
 
 (defun orgmine-project-versions (project)
-;;; TODO: who/when should `orgmine-project-versions' be updated?
-;;   (let ((versions (assoc project orgmine-project-versions)))
-;;     (if versions
-;; 	(cdr versions)
-;;       (let* ((version-list (elmine/get-project-versions project))
-;; 	     (versions (mapcar (lambda (version)
-;; 				 (orgmine-idname version))
-;; 			       version-list)))
-;; 	(add-to-list 'orgmine-project-versions (cons project versions))
-;; 	versions))))
   (let ((versions (elmine/get-project-versions project)))
     (mapcar (lambda (version)
 	      (orgmine-idname version))
@@ -1965,9 +1745,6 @@ return the issue number of the current entry."
 		    default-prop)))
     (if (member property keys)
 	property
-;;       (or (cdr (assoc (downcase property)
-;; 		      (mapcar (lambda (x) (cons (downcase x) x))
-;; 			      keys)))
       (or (cdr (assoc-string property keys t))
 	  property))))
 
@@ -2100,28 +1877,6 @@ The variables to be copies are whose names start with
 (defun orgmine-archived-versions ()
   (orgmine-archived-ids orgmine-tag-version 'fixed_version))
 
-;; (defun orgmine-archived-issues ()
-;;   (let ((afile (org-extract-archive-file)))
-;;     (if (file-exists-p afile)
-;; 	(let* ((curbuf (current-buffer))
-;; 	       (visiting (find-buffer-visiting afile))
-;; 	       (buffer (or visiting (find-file-noselect afile)))
-;; 	       id-list)
-;; 	  (unless buffer
-;; 	    (error "Cannot access file \"%s\"" afile))
-;; 	  (with-current-buffer buffer
-;; 	    (org-with-wide-buffer
-;; 	     (org-mode)
-;; 	     (orgmine-mode)
-;; 	     (orgmine-copy-buffer-local-variables curbuf buffer)
-;; 	     (goto-char (point-min))
-;; 	     (while (orgmine-find-headline orgmine-tag-issue)
-;; 	       (let ((id (orgmine-get-id nil)))
-;; 		 (if id
-;; 		     (add-to-list 'id-list (string-to-number id))))
-;; 	       (outline-next-heading))))
-;; 	  id-list))))
-
 
 ;;; Interactive Functions
 
@@ -2242,12 +1997,6 @@ NB: the issue is not submitted to the server."
     (org-toggle-tag orgmine-tag-issue 'on)
     (org-toggle-tag orgmine-tag-create-me 'on)
     (insert " ")
-    ;;
-;;     (forward-line)
-;;     (orgmine-insert-demoted-heading
-;;      "Description" (list orgmine-tag-description orgmine-tag-update-me))
-;;     (orgmine-insert-note "" t)
-    ;;
     (goto-char pos)
     (org-set-property "om_start_date"
 		      (format-time-string (org-time-stamp-format nil t)
@@ -2305,11 +2054,6 @@ NB: the journal is not submitted to the server."
   "Add redmine description entry for the issue at the current position.
 NB: the description is not submitted to the server."
   (interactive "P")
-;;   (let* ((issue (orgmine-find-headline-ancestor orgmine-tag-issue))
-;; 	 (beg (org-element-property :begin issue))
-;; 	 (end (copy-marker (cdr (orgmine-subtree-region))))
-;; 	 (id (orgmine-get-id beg)))
-;;     (goto-char beg)
   (let* ((pos (point))
 	 (region (and (orgmine-current-issue-heading)
 		      (orgmine-subtree-region)))
@@ -2348,11 +2092,6 @@ NB: the description is not submitted to the server."
   "Add redmine attachments entry for the issue at the current position.
 NB: the attachments is not submitted to the server."
   (interactive "P")
-;;   (let* ((issue (orgmine-find-headline-ancestor orgmine-tag-issue))
-;; 	 (beg (org-element-property :begin issue))
-;; 	 (end (copy-marker (cdr (orgmine-subtree-region))))
-;; 	 (id (orgmine-get-id beg)))
-;;     (goto-char beg)
   (let* ((pos (point))
 	 (region (and (orgmine-current-issue-heading)
 		      (orgmine-subtree-region)))
@@ -2518,42 +2257,6 @@ set PROPERTY to VALUE."
   (interactive (list nil current-prefix-arg))
   (orgmine-set-entry-property nil value arg))
 
-;; (defun orgmine-submit-issue-update (issue force &optional no-prompt)
-;;   "Submit the issue update to Redmine."
-;;   (org-save-outline-visibility t
-;;     (show-branches)
-;; ;;     (show-all)
-;;     (let* ((plist (orgmine-collect-update-plist issue))
-;;  	   (id (plist-get plist :id)))
-;; ;; 	   (id (or (plist-get plist :id)
-;; ;; 		   (orgmine-get-id (org-element-property :begin issue)))))
-;;       (unless id
-;; 	(error "No issue ID found at position %d"
-;; 	       (org-element-property :begin issue)))
-;;       (if (or force
-;; 	      (member orgmine-tag-update-me (org-element-property :tags issue))
-;; 	      (plist-get plist :description)
-;; 	      (plist-get plist :notes))
-;; 	  (let* ((redmine-issue (orgmine-get-issue id))
-;; 		 (up-to-date-p
-;; 		  (orgmine-entry-up-to-date-p issue redmine-issue)))
-;; 	    (if up-to-date-p
-;; 		(if (or no-prompt
-;; 			(y-or-n-p
-;; 			 (format "Will you update issue #%s? %s" id plist)))
-;; 		    (progn
-;; 		      (elmine/update-issue plist)
-;; 		      (orgmine-fetch-issue t)))
-;; 	      (if (not force)
-;; 		  (error "#%s: issue has been updated by other user." id)
-;; 		(if (yes-or-no-p
-;; 		     (format "#%s: issue has been updated by other user.
-;; Will you force to update issue #%s? %s" id id plist))
-;; 		    (progn
-;; 		      (elmine/update-issue plist)
-;; 		      (orgmine-fetch-issue t))))))
-;; 	(message "#%s: no need to submit update." id)))))
-
 (defun orgmine-create-issue (issue)
   "Submit new issue entry to Redmine."
   (save-excursion
@@ -2669,14 +2372,6 @@ found in the region from BEG to END."
       (outline-next-heading))
     (goto-char pos)))
 
-;; (defun orgmine-submit-issue-subtree (force)
-;;   (interactive "P")
-;;   (let* ((subtree (orgmine-subtree-region))
-;; 	 (beg (car subtree))
-;; 	 (end (cdr subtree)))
-;;     (orgmine-submit-issue-region beg end force)
-;;     (message "Done.")))
-
 ;;;
 
 (defvar orgmine-ignore-ids)
@@ -2695,9 +2390,6 @@ found in the region from BEG to END."
     (org-remove-occur-highlights))
   (let ((pos (point)))
     (goto-char (point-min))
-;;     (unless (orgmine-find-issue id (point-max))
-;;       (goto-char pos)
-;;       (error "Issue#%s not found" id))))
     (if (orgmine-find-issue id (point-max))
 	(set-mark pos)
       (goto-char pos)
@@ -2917,27 +2609,6 @@ new entry will be inserted into the current position."
 		  (if (= (funcall outline-level) 1)
 		      (org-demote-subtree)))))
 	  id-list)))
-;; (defun orgmine-insert-or-update-issue (id-list end force)
-;;   "Insert or update the issue entries of ID-LIST.
-;; If the issue entry does not exist after the current position,
-;; new entry will be inserted into the current position."
-;;   (let ((beg (point)))
-;;     (mapc (lambda (id)
-;; 	    (goto-char beg)
-;; 	    (let* ((issue (and (orgmine-find-issue id end)
-;; 			       (org-element-at-point))))
-;; 	      (if issue
-;; 		  ;; refetch issue so that it contains journals.
-;; 		  (let ((redmine-issue (orgmine-get-issue id nil)))
-;; 		    (orgmine-update-issue issue redmine-issue force))
-;; 		;; insert issue as new entry.
-;; 		(goto-char beg)
-;; 		(outline-next-heading)
-;; ;; 		(orgmine-insert-issue id nil (list :issue redmine-issue))
-;; 		(orgmine-insert-issue id nil nil t) ; XXX: refetch
-;; 		(if (= (funcall outline-level) 1)
-;; 		    (org-demote-subtree)))))
-;; 	  id-list)))
 
 (defun orgmine-get-issues (beg)
   "get issues from redmine on current condition."
@@ -2988,7 +2659,6 @@ or newly inserted per REDMINE-ISSUES."
 	  (reverse redmine-issues))
     id-list))
 
-;; (defun orgmine-fetch-region (beg end &optional cache)
 (defun orgmine-sync-issues (beg end &optional force update-only cache)
   "update entries between BEG and END from the condition.
 If UPDATE-ONLY is nil, insert issue that does not exist in the buffer."
@@ -3027,80 +2697,7 @@ If UPDATE-ONLY is nil, insert issue that does not exist in the buffer."
      (goto-char beg)
      (orgmine-sync-issues beg end force update-only)
      (set-marker end nil))))
-;; (defun orgmine-sync-region (beg end &optional force cache)
-;;   (interactive "r\nP")
-;;   (if (and (org-called-interactively-p 'interactive)
-;; 	   (not (org-region-active-p)))
-;;       (error "region not active"))
-;;   (let ((orgmine-ignore-ids orgmine-ignore-ids))
-;;     (if (org-called-interactively-p 'interactive)
-;; 	(setq orgmine-ignore-ids nil))
-;;     (setq end (copy-marker end))
-;;     (org-with-wide-buffer			; XXX
-;;      (orgmine-submit nil)
-;;      (goto-char beg)
-;;      (orgmine-submit-issue-region beg end nil)
-;;      ;; update version/tracker/project properties
-;;      (goto-char beg)
-;;      (orgmine-fetch force) ; XXX: issue headline before beg could be updated.
-;;      ;; update issues
-;;      (goto-char beg)
-;;      (let* ((filters (orgmine-get-filters beg))
-;; 	    (project (plist-get filters :project_id))
-;; 	    ;; XXX: elmine/get-issues does not return issues with journals
-;; 	    ;; even when ':include "journals"' is passed as the parameter.
-;; 	    (redmine-issues
-;; 	     (if (not project)
-;; 		 (error "no project property (project_id) exists")
-;; 	       (message "retrieving issues with filter: %s" filters)
-;; 	       (apply 'elmine/get-project-issues project filters)))
-;; 	    id-list)
-;;        (if (not redmine-issues)
-;; 	   (message "no issue exists for %s" filters)
-;; 	 (message "%d issue(s) retrieved." (length redmine-issues))
-;; 	 (mapc (lambda (redmine-issue)
-;; 		 (goto-char beg)
-;; 		 (let* ((id (plist-get redmine-issue :id))
-;; 			(issue (and (orgmine-find-issue id end)
-;; 				    (org-element-at-point)))
-;; 			(issue-outside-p
-;; 			 (unless issue (save-excursion
-;; 					 (goto-char (point-min))
-;; 					 (orgmine-find-issue id (point-max))))))
-;; 		   (cond (issue-outside-p
-;; 			  (message "issue #%s skipped (out of region)" id))
-;; 			 ((and (not force) issue
-;; 			       (orgmine-entry-up-to-date-p issue redmine-issue))
-;; 			  (message
-;; 			   "issue #%s skipped (no change since last sync)"
-;; 			   id))
-;; 			 (t (add-to-list 'id-list id)))))
-;; 	       (reverse redmine-issues))
-;; 	 (if id-list
-;; 	     (progn
-;; 	       (goto-char beg)
-;; 	       (orgmine-insert-or-update-issue id-list end t)
-;; 	       (message "%d issue(s) retrieved - synchronized issues: %s"
-;; 			(length redmine-issues)
-;; 			(mapconcat (lambda (id) (format "#%s" id))
-;; 				   id-list " ")))
-;; 	   (message "%d issue(s) retrieved - no issue to sync."
-;; 		    (length redmine-issues))))))
-;;     (set-marker end nil)))
 
-(defun orgmine-descendent-entries ()
-  (let* ((subtree (orgmine-subtree-region))
-	 (beg (car subtree))
-	 (end (cdr subtree)))
-    ))
-
-;; (defun orgmine-sync-subtree (force)
-;;   (interactive "P")
-;;   (org-with-wide-buffer
-;;    (let* ((subtree (orgmine-subtree-region))
-;; 	  (beg (car subtree))
-;; 	  (end (cdr subtree)))
-;;      (orgmine-sync-region beg end force))))
 (defun orgmine-sync-subtree (force)
   (interactive "P")
   (org-with-wide-buffer
@@ -3132,9 +2729,6 @@ in depth first manner."
   (let* ((region (orgmine-subtree-region))
 	 (beg (car region))
 	 (end (copy-marker (cdr region))))
-;;   (let ((tags (list orgmine-tag-project orgmine-tag-version
-;; 		    orgmine-tag-tracker))
-;; 	     (end (make-marker)))
     (save-excursion
       (if (org-goto-first-child)
 	  (orgmine-map-region (lambda ()
@@ -3172,78 +2766,7 @@ in depth first manner."
     (message ">>> ending buffer synchronization ------------------------")
     (message
      "check *Messages* buffer for entries that might not be sync'ed.")))
-;; (defun orgmine-sync-buffer (&optional force)
-;;   "Synchronize the whole entries in the buffer."
-;;   (interactive "P")
-;;   (when (yes-or-no-p
-;; 	 "Will you sync the whole buffer (it may take long time) ? ")
-;;     (org-with-wide-buffer
-;;      (let ((orgmine-ignore-ids nil)
-;; 	   (beg (progn
-;; 		  (goto-char (point-min))
-;; 		  (and (org-before-first-heading-p) (outline-next-heading))
-;; 		  (point)))
-;; 	   (end (point-max)))
-;;        ;; sync each subtrees one by one from top to bottom of buffer.
-;;        (goto-char beg)
-;;        (let ((tags (list orgmine-tag-project orgmine-tag-version
-;; 			 orgmine-tag-tracker))
-;; 	     (end (make-marker)))
-;; 	 (while (orgmine-find-headline tags)
-;; 	   (set-marker end (cdr (orgmine-subtree-region)))
-;; 	   (orgmine-sync-subtree force)
-;; 	   (goto-char end)))
-;;        ;;
-;;        (goto-char beg)
-;;        (orgmine-sync-issues beg end force t)))
-;;     (message
-;;      "check *Messages* buffer for issue entries that may not be synced")))
 
-
-;; (defun orgmine-ediff-entry (beg id-prop orgmine-insert-entry-func
-;; 				&optional show-no-child)
-;;   "Run Ediff on local entry and Redmine server entry."
-;;   (interactive "P")
-;;   (org-with-wide-buffer
-;;    (goto-char beg)
-;;    (let* ((subtree (orgmine-subtree-region))
-;; 	  (beg (car subtree))
-;; 	  (end (if show-no-child (progn (goto-char beg)
-;; 					(outline-next-heading)
-;; 					(point))
-;; 		 (cdr subtree)))
-;; 	  (id (orgmine-get-id beg id-prop)))
-;;      (unless id (error "Redmine issue headline without ID (om_id prop)"))
-;;      (narrow-to-region beg end)
-;;      (show-all)
-;;      (goto-char (point-min))
-;;      (let ((level (funcall outline-level))
-;; 	   (buf-a (get-buffer-create "*ORGMINE-LATEST*"))
-;; 	   (buf-b (current-buffer)))
-;;        (with-current-buffer buf-a
-;; 	 (read-only-mode 0)
-;; 	 (erase-buffer)
-;; 	 (org-mode)
-;; 	 (orgmine-mode)
-;; 	 (mapc (lambda (var)
-;; 		 (let ((symbol (car var))
-;; 		       (value (cdr var)))
-;; 		   (if (string-match "^\\(orgmine-\\|org-\\|elmine/\\)"
-;; 				     (symbol-name symbol))
-;; 		       (set (make-local-variable symbol) value))))
-;; 	       (buffer-local-variables buf-b))
-;; 	 (goto-char (point-min))
-;; 	 (funcall orgmine-insert-entry-func id)
-;; 	 (goto-char (point-max))
-;; 	 (unless (bolp) (insert "\n"))
-;; 	 (goto-char (point-min))
-;; 	 (show-all)
-;; 	 (while (> level 1)
-;; 	   (org-demote-subtree)
-;; 	   (setq level (1- level)))
-;; 	 (set-buffer-modified-p nil)
-;; 	 (read-only-mode))
-;;        (ediff-buffers buf-a buf-b)))))
 (defun orgmine-ediff-entry (beg id-prop orgmine-fetch-entry-func
 				&optional show-no-child)
   "Run Ediff on local entry and Redmine server entry."
@@ -3270,13 +2793,6 @@ in depth first manner."
 	 (erase-buffer)
 	 (org-mode)
 	 (orgmine-mode)
-;; 	 (mapc (lambda (var)
-;; 		 (let ((symbol (car var))
-;; 		       (value (cdr var)))
-;; 		   (if (string-match "^\\(orgmine-\\|org-\\|elmine/\\)"
-;; 				     (symbol-name symbol))
-;; 		       (set (make-local-variable symbol) value))))
-;; 	       (buffer-local-variables buf-b))
 	 (orgmine-copy-buffer-local-variables buf-b buf-a)
 	 (goto-char (point-min))
 	 (insert contents)
@@ -3288,10 +2804,6 @@ in depth first manner."
 	 (show-all)
 	 (set-buffer-modified-p nil)
 	 (read-only-mode))
-;;        (ediff-buffers buf-a buf-b
-;; 		      '(lambda ()
-;; 			(set (make-local-variable 'ediff-quit-hook)
-;; 			     (lambda () (erase-buffer buf-a)))))
        (defvar orgmine-ediff-buf-a)
        (setq orgmine-ediff-buf-a buf-a)
        (ediff-buffers buf-a buf-b
@@ -3300,11 +2812,7 @@ in depth first manner."
 			  (add-hook 'ediff-quit-hook
 				    (lambda ()
 				      (kill-buffer orgmine-ediff-buf-a))))))
-;;        (with-current-buffer ediff-control-buffer
-;; 	   (ediff-unique-buffer-name "*Ediff Control Panel" "*")
-;; 	 (set (make-local-variable 'ediff-quit-hook)
-;; 	      (lambda () (erase-buffer buf-a)))
-	 ))))
+       ))))
 
 (defun orgmine-ediff-issue (arg)
   "Run Ediff on local issue entry and Redmine server issue entry."
@@ -3350,46 +2858,6 @@ Then entry could be an issue, version, tracker or project."
 	    ((member orgmine-tag-tracker tags) (orgmine-ediff-tracker arg))
 	    ((member orgmine-tag-project tags) (orgmine-ediff-project arg))
 	    (t (orgmine-ediff-issue arg))))))
-
-;; (defun orgmine-ediff (arg)
-;;   "Run Ediff on local entry and Redmine server entry."
-;;   (interactive "P")
-;;   (let ((issue (orgmine-find-headline-ancestor orgmine-tag-issue)))
-;;     (unless issue (error "No redmine issue headline found"))
-;;     (org-with-wide-buffer
-;;      (goto-char (org-element-property :begin issue))
-;;      (let* ((subtree (orgmine-subtree-region))
-;; 	    (beg (car subtree))
-;; 	    (end (cdr subtree))
-;; 	    (id (orgmine-get-id beg)))
-;;        (unless id (error "Redmine issue headline without ID (om_id prop)"))
-;;        (narrow-to-region beg end)
-;;        (show-all)
-;;        (goto-char (point-min))
-;;        (let ((level (funcall outline-level))
-;; 	     (buf-a (get-buffer-create "*ORGMINE-LATEST*"))
-;; 	     (buf-b (current-buffer)))
-;; 	 (with-current-buffer buf-a
-;; 	   (erase-buffer)
-;; 	   (org-mode)
-;; 	   (orgmine-mode)
-;; 	   (mapc (lambda (var)
-;; 		   (let ((symbol (car var))
-;; 			 (value (cdr var)))
-;; 		     (if (string-match "^\\(orgmine-\\|org-\\|elmine/\\)"
-;; 				       (symbol-name symbol))
-;; 			 (set (make-local-variable symbol) value))))
-;; 		 (buffer-local-variables buf-b))
-;; 	   (goto-char (point-min))
-;; 	   (orgmine-insert-issue id)
-;; 	   (goto-char (point-min))
-;; 	   (show-all)
-;; 	   (while (> level 1)
-;; 	     (org-demote-subtree)
-;; 	     (setq level (1- level)))
-;; 	   (set-buffer-modified-p nil)
-;; 	   (read-only-mode))
-;; 	 (ediff-buffers buf-a buf-b))))))
 
 ;;;;
 
@@ -3482,3 +2950,5 @@ Then entry could be an issue, version, tracker or project."
 ;;       (org-toggle-tag orgmine-tag-update-me 'on)))
 
 (provide 'orgmine)
+
+;; orgmine.el ends here
