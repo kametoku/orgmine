@@ -4,15 +4,21 @@
 * About orgmine mode
 
 ~orgmine-mode~ is a minor mode for org-mode with Redmine integration.
+In a =orgmine-mode= buffer, you can retrieve the issues from Redmine,
+edit the entries of local, and submit the changes to Redmine.
 
 * Getting started
 
 ** Requirements
 
-=orgmine.el= depends on the following emacs lisp packages.
+=orgmine= depends on the following emacs lisp packages.
 Install these packages as well.
 - elmine
 - s
+
+=orgmine= was developed and tested on the following environment:
+- GNU Emacs 24.3.1
+- Org-mode 8.3.2
 
 ** Download and put orgmine.el to a directory in `load-path'.
 
@@ -20,6 +26,11 @@ The latest version of =orgmine.el= is available from:
 https://github.com/kametoku/orgmine
 
 ** Edit your ~/.emacs
+
+Add the following lines to your =~/.emacs= file so that the orgmine minor mode
+is activated when the "om_project" property is defined as the file-wide
+property.
+Note that "om_project" property is a mandatory property to use orgmine.
 
 #+begin_src emacs-lisp
   (require 'orgmine)
@@ -58,10 +69,10 @@ Prior to do this, please get the API key of the redmine REST API.
            (user-name-format . "%{firstname} %{lastname}"))))
 #+end_src
 
-| Key                  | default                      | Description             |
+| Key                  | variable to define default   | Description             |
 |----------------------+------------------------------+-------------------------|
-| host                 | elmine/host                  | URL of Redmine          |
-| api-key              | elmine/api-key               | API Key for the Redmine |
+| host                 | elmine/host                  | URL of redmine          |
+| api-key              | elmine/api-key               | API Key for the redmine |
 | issue-title-format   | orgmine-issue-title-format   | Issue title format      |
 | journal-title-format | orgmine-journal-title-format | Journal title format    |
 | version-title-format | orgmine-version-title-format | Version title format    |
@@ -163,6 +174,183 @@ The property =om_server= determines which server setting in
   ,#+COLUMNS: %50ITEM(Task) %9om_assigned_to(Assigned) %8om_tracker(Tracker) %5Effort(Est.){:} %CLOCKSUM(Clock) %SCHEDULED %DEADLINE %TAGS
 #+end_src
 
+*** Insert an existing issue as an org mode entry
+
+Run M-x orgmine-insert-issue (or press C-c m I) and enter an issue id
+to insert the issue entry.
+
+This operation is not usual but just for demonstration.
+As usual, the issue entries are placed
+under project, version or tracker subtree and maintained there.
+
+The following is an example of issue entry.
+Notice that the issue attributes are inserted as properties of the entry,
+the issue description, attachments, journals (comments) are inserted
+as child entry of the issue entry.
+They are located by the tags (:issue:, :description:, :attachments: :journals:,
+and :journal: in this example).
+
+Note that the start date and due date attributes of the Redmine issue
+are converted to SCHEDULE and DEADLINE properties of org-mode entry,
+and the status attribute of the Redmine issue is converted to the
+TODO keywords of org-mode entry.
+
+#+begin_src org
+  ,* New [[redmine:issues/24]] Implement orgmine-xxx function :issue:
+    SCHEDULED: <2015-09-11 Fri>
+    :PROPERTIES:
+    :om_id:    24
+    :om_tracker: 4:Task
+    :om_created_on: 2015-09-11T14:01:25Z
+    :om_updated_on: 2015-09-19T18:30:18Z
+    :om_status: 1:New
+    :om_fixed_version: 3:Test
+    :om_start_date: [2015-09-11 Fri]
+    :om_done_ratio: 0
+    :om_project: 1:SandBox
+    :END:
+  ,** Description 							       :description:
+     ,#+begin_src gfm
+       This is a hard part.
+     ,#+end_src
+  ,** Attachments							       :attachments:
+     - [[http://redmine.example.org/attachments/download/12/a.jpg][a.jpg]] (25370 bytes) Tokuya Kameshima [2015-09-14 Mon 01:13]
+       abcdefg
+  ,** Journals							       :journals:
+  ,*** [[redmine:issues/24#note-2]] [2015-09-20 Sun 03:30] Tokuya Kameshima 	 :journal:
+      :PROPERTIES:
+      :om_count: 2
+      :END:
+      ,#+begin_src gfm
+	This is a note...
+      ,#+end_src
+  ,*** [[redmine:issues/24#note-1]] [2015-09-14 Mon 01:15] Tokuya Kameshima :journal:
+      :PROPERTIES:
+      :om_count: 1
+      :END:
+      :DETAILS:
+      - attachment_11: ADDED -> "naorio.JPG"
+      :END:
+#+end_src
+
+*** Update the issue
+
+Now, we are going to edit the issue entry and send the changes to Redmine.
+
+**** Edit the issue entry locally
+
+You can edit the issue entry in orgmine buffer to update the issue.
+The following updates are supported.
+
+- Change the issue attributes.
+  --- =orgmine-set-entry-property= (C-c m ; ;)
+- Change the issue status.
+  --- =org-todo= (C-c C-t)
+- Change the start date.
+  --- =org-schedule= (C-c C-s)
+- Change the due date.
+  --- =org-deadline= (C-c C-d)
+- Change or add the description.
+  --- =orgmine-add-description= (C-c m d)
+- Add a journal note.
+  --- =orgmine-add-journal= (C-c m j)
+- Add attachments to the issue.
+  --- =orgmine-add-attachment= (C-c m a)
+
+If you edit description note by hand, you need add :UPDATE_ME: tag to
+the description headline.
+:UPDATE_ME: is a special tag for orgmine-mode to locate the portion of
+local changes when submitting the change to Redmine.
+
+#+begin_src org
+  ,** Description			       :UPDATE_ME:description:
+     ,#+begin_src gfm
+       This is a hard part.  <-- Not really...
+     ,#+end_src
+#+end_src
+
+**** Send the changes to Redmine
+
+To submit the changes to Redmine, move the cursor to the issue headline
+and run M-x orgmine-submit (C-c m c).
+
+If there are no problems, the changes are sent to Redmine and the local
+issue entry is updated by new contents and attributes.
+
+**** Investigate differences between local entry and Redmine
+
+If someone else has updated the issue while you are editing the issue entry,
+you will get the following error when submitting the changes.
+
+#+begin_example
+  #24: entry has been updated by other user.
+#+end_example
+
+In this case, you can run M-x orgmine-ediff (C-c m ?) to run ediff on
+the Redmine's latest issue contents and your local entry.
+And you can investigate the differences of them and merge the update
+to your entry.
+
+*** Fetch the update of the issue
+
+Move the cursor to the issue headline and run M-x orgmine-fetch (C-c m f)
+to fetch the latest contents of the issue from Redmine and update the
+local entry.
+
+*** Add a new issue
+
+You can run M-x orgmine-add-issue (C-c m i) to add a new issue entry.
+
+#+begin_src org
+  ,* New 					:issue:CREATE_ME:
+    :PROPERTIES:
+    :om_start_date: [2015-10-16 Fri]
+    :END:
+#+end_src
+
+After editing the entry (e.g., adding title, description, attributes
+and due date), run M-x orgmine-submit (C-c m c) to submit the new
+issue to Redmine.  The contents are sent to Redmine and the local entry
+is updated with the issue created.
+
+The following is an example of issue entry just after creation.
+
+#+begin_src org
+  ,* New [[redmine:issues/25][#25]] write document about orgmine  :issue:
+    DEADLINE: <2015-10-23 Fri> SCHEDULED: <2015-10-16 Fri>
+    :PROPERTIES:
+    :om_id:    25
+    :om_tracker: 4:Task
+    :om_created_on: 2015-10-16T07:58:51Z
+    :om_updated_on: 2015-10-16T07:58:51Z
+    :om_status: 1:New
+    :om_fixed_version: 5:Documentation
+    :om_start_date: [2015-10-16 Fri]
+    :om_due_date: [2015-10-23 Fri]
+    :om_done_ratio: 0
+    :om_project: 1:SandBox
+    :END:
+#+end_src
+
+The following table summarizes the org mode properties and redmine attributes
+for an issue entry.
+
+| Org-mode Property | Redmine Attribute      | Comment                        |
+|-------------------+------------------------+--------------------------------|
+| om_id             | issue id               |                                |
+| om_tracker        | tracker                | id + ":" + tracker name        |
+| om_created_on     | creation date&time     | w/timezone format              |
+| om_updated_on     | last updated date&time | w/timezone format              |
+| om_status         | issue status           | converted to TODO keywords     |
+| om_fixed_version  | fixed version          | id + ":" + version name        |
+| om_start_date     | issue start date       | converted to SCHEDULE property |
+| om_due_date       | issue due date         | converted to DEADLINE property |
+| om_done_ratio     | issue done ratio       |                                |
+| om_project        | issue's project        | id + ":" + project name        |
+
+Note that if both of a property and the corresponding special keyword
+exist for a single issue entry, the special keyword is preferred.
+
 *** Project subtree
 
 Now, you are ready to retrieve the entries from the redmine.
@@ -176,7 +364,7 @@ Notice the project properties are inserted as the entry's properties
 and the project description is inserted as a sub entry and quoted in src block.
 
 #+begin_src org
-  ,* SandBox ([[redmine:projects/sandbox]])
+  ,* SandBox ([[redmine:projects/sandbox]])                         :project:
     :PROPERTIES:
     :om_project: 1:SandBox
     :om_created_on: 2015-07-31T06:40:56Z
@@ -184,28 +372,52 @@ and the project description is inserted as a sub entry and quoted in src block.
     :om_status: 1
     :om_identifier: sandbox
     :END:
-  ,** Description                                                     :description:
+  ,** Description                                                   :description:
      ,#+begin_src gfm
-       This is a sandbox project. Feel free to use the project.
+       This is a sandbox project. Feel free to play with this project.
      ,#+end_src
 #+end_src
 
 **** Retrieving issues
 
 Move the cursor on the line of project headline and run
-M-x orgmine-sync-subtree-recursively (C-c m s) to retrieve all the issues
+M-x =orgmine-sync-subtree-recursively= (=C-c m s=) to retrieve all the issues
 of the project.
+The issue entries are inserted as the child entries of the project entry.
 
 *** Version subtree
 
-*** Tracker subtree
+You can maintain the issue entries of a certain version in a subtree.
+
+The following is an example of Version subtree
 
 #+begin_src org
-  ,* Milestone                                                            :tracker:
+  ,* [[redmine:versions/3]] Sprint-001				:version:
+    DEADLINE: <2015-09-04 Fri>
+    :PROPERTIES:
+    :om_fixed_version: 3:Sprint-001
+    :om_created_on: 2015-08-02T14:18:41Z
+    :om_updated_on: 2015-08-04T16:12:22Z
+    :om_status: open
+    :om_due_date: [2015-09-04 Fri]
+    :om_project: 1:SandBox
+    :END:
+#+end_src
+
+*** Tracker subtree
+
+As well as versions, you can put the issues of a certain tracker
+in a subtree.
+
+The following piece of org-mode file demonstrates a tracker subtree.
+You can put the issue entries of Milestone tracker in the "* Milestone" tree.
+
+#+begin_src org
+  ,* Milestone                                                    :tracker:
     :PROPERTIES:
     :om_tracker: 8:Milestone
     :END:
-  ,** [[redmine:issue/1]] New Code Freeze                                 :issue:
+  ,** [[redmine:issue/1]] New Code Freeze                         :issue:
      DEADLINE: <2015-09-30 Wed> SCHEDULED: <2015-09-30 Wed>
      :PROPERTIES:
      :om_id: 123
@@ -220,10 +432,26 @@ of the project.
      :END:
 #+end_src
 
+*** Sync the buffer with Redmine
+
+So far, we used M-x orgmine-sync-subtree-recursively (C-c m s) to
+synchronize the entries with Redmine.
+You can use M-x orgmine-sync-buffer (C-c m S) to synchronize
+entries of whole the buffer with Redmine.
+
+* The open issues
+
+1. Not enough error handling.
+   =orgmine= uses =elmine.el= to communicate with Redmine but =elmine.el=
+   does not raise the errors even when Redmine returns some error code.
+
 * Customization
 
+You can customize =orgmine= with M-x customize.
+See the docstring of each customizable variables of =orgmine=.
+
 #+SEQ_TODO: New(n) Open(o) Resolved(r) Feedback(f) | Closed(c)
-#+OPTIONS: ':nil *:t -:t ::t <:t H:3 \n:nil ^:{} arch:headline
+#+OPTIONS: ':nil *:t -:t ::t <:t H:4 \n:nil ^:{} arch:headline
 #+OPTIONS: author:nil c:nil creator:nil d:(not "LOGBOOK") date:t e:t
 #+OPTIONS: email:nil f:t inline:t num:nil p:nil pri:nil prop:nil
 #+OPTIONS: stat:t tags:nil tasks:t tex:t timestamp:t title:t toc:t
