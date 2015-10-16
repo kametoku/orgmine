@@ -27,7 +27,7 @@
 
 ;; orgmine is a minor mode for org-mode with Redmine integration.
 ;; In a orgmine-mode buffer, you can retrieve the issues from Redmine,
-;; edit the entries of local, and submit the changes to Redmine.
+;; edit the entries locally, and submit the changes to Redmine.
 
 ;; - [ ] implement orgmine-copy-issue to push an issue tree to clipboard
 ;;   so that it will be inserted into the buffer as a new issue.
