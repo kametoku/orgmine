@@ -1,11 +1,101 @@
 #+title: sample org-mode file for orgmine
 
+* An example of ~/.emacs configuration
+#+begin_src emacs-lisp
+  (require 'orgmine)
+  (add-hook 'org-mode-hook
+            (lambda () (if (assoc "om_project" org-file-properties)
+                           (orgmine-mode))))
+  (setq org-link-abbrev-alist
+	'(("redmine" . "http://redmine.example.com/")
+	  ;;...
+	  ))
+  (setq orgmine-servers
+	'(("redmine"                      ; server name for this entry
+	   (host . "http://redmine.example.com")
+	   (api-key . "blabblabblab")	; your Redmine REST API key
+	   (issue-title-format . "[[redmine:issues/%{id}][#%{id}]] %{subject}")
+	   (journal-title-format . "[[redmine:issues/%{id}#note-%{count}][V#%{id}-%{count}]] %{created_on} %{author}")
+	   (version-title-format . "[[redmine:versions/%{id}][V#%{id}]] %{name}")
+	   (tracker-title-format . "%{name}")
+	   (project-title-format . "[[redmine:projects/%{identifier}][%{identifier}]] %{name}")
+	   (user-name-format . "%{firstname} %{lastname}"))))
+  (setq orgmine-tags '((update-me . "UPDATE_ME")
+		       (create-me . "CREATE_ME")
+		       (project . "project")
+		       (tracker . "tracker")
+		       (version . "version")
+		       (issue . "issue")
+		       (description . "description")
+		       (journals . "journals")
+		       (journal . "journal")
+		       (attachments . "attachments")
+		       (wiki . "wiki")))
+#+end_src
+* SandBox ([[redmine:projects/sandbox]])                         :project:
+  :PROPERTIES:
+  :om_project: 1:SandBox
+  :om_created_on: 2015-07-31T06:40:56Z
+  :om_updated_on: 2015-08-18T05:42:26Z
+  :om_status: 1
+  :om_identifier: sandbox
+  :END:
+** Description                                                   :description:
+   #+begin_src gfm
+     This is a sandbox project. Feel free to play with this project.
+   #+end_src
+
+* [[redmine:versions/3][V#3]] Sprint-001				:version:
+  DEADLINE: <2015-09-04 Fri>
+  :PROPERTIES:
+  :om_fixed_version: 3:Sprint-001
+  :om_created_on: 2015-08-02T14:18:41Z
+  :om_updated_on: 2015-08-04T16:12:22Z
+  :om_status: open
+  :om_due_date: [2015-09-04 Fri]
+  :om_project: 1:SandBox
+  :END:
 * Tasks 							       :tracker:
   :PROPERTIES:
   :om_tracker: 4:Task
   :om_fixed_version: !*
   :END:
   - tickets which do not belong to any version.
+** New [[redmine:issues/24][#24]] Implement orgmine-xxx function		       :issue:
+   SCHEDULED: <2015-09-11 Fri>
+   :PROPERTIES:
+   :om_id:    24
+   :om_tracker: 4:Task
+   :om_created_on: 2015-09-11T14:01:25Z
+   :om_updated_on: 2015-09-19T18:30:18Z
+   :om_status: 1:New
+   :om_fixed_version: 3:Test
+   :om_start_date: [2015-09-11 Fri]
+   :om_done_ratio: 0
+   :om_project: 1:SandBox
+   :END:
+*** Description							       :description:
+    #+begin_src gfm
+      This is a hard part.
+    #+end_src
+*** Attachments							       :attachments:
+    - [[http://redmine.example.org/attachments/download/12/a.jpg][a.jpg]] (25370 bytes) Tokuya Kameshima [2015-09-14 Mon 01:13]
+      abcdefg
+*** Journals							       :journals:
+**** [[redmine:issues/24#note-2]] [2015-09-20 Sun 03:30] Tokuya Kameshima  :journal:
+     :PROPERTIES:
+     :om_count: 2
+     :END:
+     #+begin_src gfm
+       This is a note...
+     #+end_src
+**** [[redmine:issues/24#note-1]] [2015-09-14 Mon 01:15] Tokuya Kameshima  :journal:
+     :PROPERTIES:
+     :om_count: 1
+     :END:
+     :DETAILS:
+     - attachment_11: ADDED -> "naorio.JPG"
+     :END:
 * Milestone							       :tracker:
   :PROPERTIES:
   :om_tracker: 8:Milestone
