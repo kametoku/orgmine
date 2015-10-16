@@ -2034,28 +2034,65 @@ The variables to be copies are whose names start with
 		  (set (make-local-variable symbol) value))))
 	  (buffer-local-variables buf-from))))
 
+(defvar orgmine-id-list-alist nil)
+
+(defun orgmine-id-list-cache (afile tag)
+  (let* ((key (format "%s:%s" afile tag))
+	 (value (cdr (assoc key orgmine-id-list-alist))))
+    value))
+
+(defun orgmine-id-list-cache-set (afile tag id-list)
+  (let* ((key (format "%s:%s" afile tag))
+	 (list (assoc key orgmine-id-list-alist))
+	 (modification-time (nth 5 (file-attributes afile)))
+	 (new-value (cons modification-time id-list)))
+    (if list
+	(setcdr list new-value)
+      (add-to-list 'orgmine-id-list-alist (cons key new-value)))))
+
+(defun orgmine-get-id-list (tag id-prop)
+  (org-with-wide-buffer
+   (goto-char (point-min))
+   (let (id-list)
+     (message "scanning %s IDs..." tag)
+     (while (orgmine-find-headline tag)
+       (let ((id (orgmine-get-id nil id-prop)))
+	 (if id (add-to-list 'id-list (string-to-number id))))
+       (outline-next-heading))
+     (message "scanning %s IDs... done" tag)
+     id-list)))
+
 (defun orgmine-archived-ids (tag id-prop)
   (let ((afile (org-extract-archive-file)))
     (if (file-exists-p afile)
 	(let* ((curbuf (current-buffer))
 	       (visiting (find-buffer-visiting afile))
-	       (buffer (or visiting (find-file-noselect afile)))
-	       id-list)
+	       (buffer
+		(or visiting
+		    (prog2
+			(message "opening archive file %s..." afile)
+			(find-file-noselect afile)
+		      (message "opening archive file %s... done" afile)))))
 	  (unless buffer
 	    (error "Cannot access file \"%s\"" afile))
 	  (unless (eq buffer curbuf)
 	    (with-current-buffer buffer
-	      (org-with-wide-buffer
-	       (org-mode)
-	       (orgmine-mode)
-	       (orgmine-copy-buffer-local-variables curbuf buffer)
-	       (goto-char (point-min))
-	       (while (orgmine-find-headline tag)
-		 (let ((id (orgmine-get-id nil id-prop)))
-		   (if id
-		       (add-to-list 'id-list (string-to-number id))))
-		 (outline-next-heading))))
-	    id-list)))))
+	      (let ((id-list-cache (orgmine-id-list-cache afile tag)))
+		(if (and (not (buffer-modified-p))
+			 (equal (nth 5 (file-attributes afile))
+				(car id-list-cache)))
+		    ;; use the cached id list if the archive file is
+		    ;; not updated since the last scan and the buffer
+		    ;; is not modified.
+		    (cdr id-list-cache)
+		  ;; Otherwise, scan the buffer for IDs and push the
+		  ;; ID list to the cache.
+		  (unless (eq major-mode 'org-mode) (org-mode))
+		  (orgmine-mode)
+		  (orgmine-copy-buffer-local-variables curbuf buffer)
+		  (let ((id-list (orgmine-get-id-list tag id-prop)))
+		    (orgmine-id-list-cache-set afile tag id-list)
+		    id-list)))))))))
 
 (defun orgmine-archived-issues ()
   (orgmine-archived-ids orgmine-tag-issue 'id))
