@@ -32,7 +32,7 @@
 		       (attachments . "attachments")
 		       (wiki . "wiki")))
 #+end_src
-* SandBox ([[redmine:projects/sandbox]])                         :project:
+* SandBox ([[redmine:projects/sandbox]])				       :project:
   :PROPERTIES:
   :om_project: 1:SandBox
   :om_created_on: 2015-07-31T06:40:56Z
@@ -40,12 +40,12 @@
   :om_status: 1
   :om_identifier: sandbox
   :END:
-** Description                                                   :description:
+** Description							       :description:
    #+begin_src gfm
      This is a sandbox project. Feel free to play with this project.
    #+end_src
 
-* [[redmine:versions/3][V#3]] Sprint-001				:version:
+* [[redmine:versions/3][V#3]] Sprint-001						       :version:
   DEADLINE: <2015-09-04 Fri>
   :PROPERTIES:
   :om_fixed_version: 3:Sprint-001
@@ -55,13 +55,13 @@
   :om_due_date: [2015-09-04 Fri]
   :om_project: 1:SandBox
   :END:
-* Tasks 							       :tracker:
+* Tasks								       :tracker:
   :PROPERTIES:
   :om_tracker: 4:Task
   :om_fixed_version: !*
   :END:
   - tickets which do not belong to any version.
-** New [[redmine:issues/24][#24]] Implement orgmine-xxx function		       :issue:
+** New [[redmine:issues/24][#24]] Implement orgmine-xxx function			       :issue:
    SCHEDULED: <2015-09-11 Fri>
    :PROPERTIES:
    :om_id:    24
@@ -82,14 +82,14 @@
     - [[http://redmine.example.org/attachments/download/12/a.jpg][a.jpg]] (25370 bytes) Tokuya Kameshima [2015-09-14 Mon 01:13]
       abcdefg
 *** Journals							       :journals:
-**** [[redmine:issues/24#note-2]] [2015-09-20 Sun 03:30] Tokuya Kameshima  :journal:
+**** [[redmine:issues/24#note-2]] [2015-09-20 Sun 03:30] Tokuya Kameshima :journal:
      :PROPERTIES:
      :om_count: 2
      :END:
      #+begin_src gfm
        This is a note...
      #+end_src
-**** [[redmine:issues/24#note-1]] [2015-09-14 Mon 01:15] Tokuya Kameshima  :journal:
+**** [[redmine:issues/24#note-1]] [2015-09-14 Mon 01:15] Tokuya Kameshima :journal:
      :PROPERTIES:
      :om_count: 1
      :END:
@@ -124,7 +124,7 @@
   :om_due_date: [2015-11-19 Thu]
   :om_project: 84:MyProject
   :END:
-** [[redmine:issue/22][#22]] New Implement wiki pages editing 			       :issue:
+** [[redmine:issue/22][#22]] New Implement wiki pages editing				       :issue:
    DEADLINE: <2015-11-13 Fri> SCHEDULED: <2015-11-11 Wed>
    :PROPERTIES:
    :Effort:   1.0h
@@ -146,7 +146,7 @@
       blab, blab, blab...
     #+end_src
 *** Journals							       :journals:
-**** Journal [[redmine:issues/22#note-1][#22#note-1]] [2015-09-10 Thu 18:13] Tokuya Kameshima	       :journal:
+**** Journal [[redmine:issues/22#note-1][#22#note-1]] [2015-09-10 Thu 18:13] Tokuya Kameshima :journal:
      :PROPERTIES:
      :om_count: 1
      :END:
