@@ -13,8 +13,8 @@
 ;; - [ ] implement orgmine-copy-issue to push an issue tree to clipboard
 ;;   so that it will be inserted into the buffer as a new issue.
 ;; - [ ] suppress adding TODO keyword to headlines without :issue: tag. If
-;;   a headline already has TODO keyword, changing todo status is
-;;   permitted.  Alternatively, If the current position is under an
+;;   a headline already has a TODO keyword, changing todo status is
+;;   permitted.  Alternatively, if the current position is under an
 ;;   issue subtree, changing todo keyword will be applied to the issue
 ;;   headline.  This is the case for setting properties as well.
 ;; - [ ] improve syncing process with cache effectively.
@@ -2931,17 +2931,22 @@ or newly inserted per REDMINE-ISSUES."
 			       (org-element-at-point)))
 		   (issue-before-region-p (save-excursion
 					    (goto-char (point-min))
-					    (orgmine-find-issue id beg))))
+					    (orgmine-find-issue id beg)))
+		   (issue-after-region-p (save-excursion
+					   (goto-char end)
+					   (orgmine-find-issue id
+							       (point-max)))))
 	      (cond ((member id orgmine-ignore-ids)
 		     (message "issue #%s skipped (updated or archived)" id))
-		    (issue-before-region-p
-		     (message "issue #%s skipped (duplicated)" id))
+		    ((and (not issue)
+			  (or issue-before-region-p issue-after-region-p))
+		     (message "issue #%s skipped (exists outside region)" id))
 		    ((and (not force) issue
 			  (orgmine-entry-up-to-date-p issue redmine-issue))
 		     (message "issue #%s skipped (no change since last sync)"
 			      id))
 		    ((and update-only (not issue))
-		     (message "issue #%s skipped (not in buffer)" id))
+		     (message "issue #%s skipped (not inside region)" id))
 		    (t (add-to-list 'id-list id)))))
 	  (reverse redmine-issues))
     id-list))
@@ -2949,8 +2954,7 @@ or newly inserted per REDMINE-ISSUES."
 ;; (defun orgmine-fetch-region (beg end &optional cache)
 (defun orgmine-sync-issues (beg end &optional force update-only cache)
   "update entries between BEG and END from the condition.
-If UPDATE-ONLY is non-nil, insert issue that does not exist in the region
-or before the region."
+If UPDATE-ONLY is nil, insert issue that does not exist in the buffer."
   (goto-char beg)
   (let* ((redmine-issues (orgmine-get-issues beg))
 	 (id-list (orgmine-collect-issues beg end redmine-issues
