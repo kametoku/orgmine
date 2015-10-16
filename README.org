@@ -11,8 +11,8 @@ edit the entries locally, and submit the changes to Redmine.
 
 ** Requirements
 
-=orgmine= depends on the following emacs lisp packages.
-Install these packages as well.
+=orgmine= depends on the following emacs lisp packages, which are
+available from MELPA.  Install these packages as well.
 - elmine
 - s
 
@@ -23,7 +23,7 @@ Install these packages as well.
 ** Download and put orgmine.el to a directory in `load-path'.
 
 The latest version of =orgmine.el= is available from:
-https://github.com/kametoku/orgmine
+http://github.com/kametoku/orgmine
 
 ** Edit your ~/.emacs
 
