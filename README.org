@@ -3,7 +3,7 @@
 
 * About orgmine mode
 
-~orgmine-mode~ is a minor mode for org-mode with Redmine integration.
+~orgmine-mode~ is a minor mode for org-mode with [[http://www.redmine.org][Redmine]] integration.
 In a =orgmine-mode= buffer, you can retrieve the issues from Redmine,
 edit the entries locally, and submit the changes to Redmine.
 
@@ -13,8 +13,8 @@ edit the entries locally, and submit the changes to Redmine.
 
 =orgmine= depends on the following emacs lisp packages, which are
 available from MELPA.  Install these packages as well.
-- elmine
-- s
+- [[https://github.com/leoc/elmine][elmine]] --- Redmine API access via elisp.
+- [[https://github.com/magnars/s.el][s]] --- The long lost Emacs string manipulation library.
 
 =orgmine= was developed and tested on the following environment:
 - GNU Emacs 24.3.1
