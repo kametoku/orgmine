@@ -181,6 +181,52 @@ Each element has the form (NAME CONFIGURATION).")
 
 (defalias 'json-read-string 'orgmine/json-read-string)
 
+;; redefine the function for workaround
+(defun orgmine/api-raw (method path data params)
+  "Perform a raw HTTP request with given METHOD, a relative PATH and a
+plist of PARAMS for the query."
+  (let* ((redmine-host (if (boundp 'redmine-host)
+                           redmine-host
+                         elmine/host))
+         (redmine-api-key (if (boundp 'redmine-api-key)
+                              redmine-api-key
+                            elmine/api-key))
+         (url (elmine/api-build-url path params))
+         (url-request-method method)
+         (url-request-extra-headers
+          `(("Content-Type" . "application/json")
+            ("X-Redmine-API-Key" . ,redmine-api-key)))
+         (url-request-data data)
+         header-end status header body)
+    (save-excursion
+      (switch-to-buffer (url-retrieve-synchronously url))
+      (beginning-of-buffer)
+      (setq header-end (save-excursion
+                         (if (re-search-forward "^$" nil t)
+                             (progn
+                               (forward-char)
+                               (point))
+                           (point-max))))
+      (when (re-search-forward "^HTTP/\\(1\\.0\\|1\\.1\\) \\([0-9]+\\) \\([A-Za-z ]+\\)$" nil t)
+        (setq status (plist-put status :code (string-to-number (match-string 2))))
+        (setq status (plist-put status :text (match-string 3))))
+      (while (re-search-forward "^\\([^:]+\\): \\(.*\\)" header-end t)
+        (setq header (cons (match-string 1) (cons (match-string 2) header))))
+      (unless (eq header-end (point-max))
+;; kame<<<
+;;         (setq body (url-unhex-string
+;;                     (buffer-substring header-end (point-max)))))
+;; =======
+	;; the body part is encoded in utf-8.
+        (setq body (buffer-substring header-end (point-max))))
+;; >>>kame     
+      (kill-buffer))
+    `(:status ,status
+      :header ,header
+      :body ,body)))
+
+(defalias 'elmine/api-raw 'orgmine/api-raw)
+
 ;;; XXX
 ;; http://www.redmine.org/projects/redmine/wiki/Rest_IssueJournals
 ;; '(:journals ((:details ((:new_value "3" :name "fixed_version_id" :property "attr"))
