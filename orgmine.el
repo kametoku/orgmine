@@ -48,6 +48,7 @@
 (require 's)
 (require 'org)
 (require 'org-archive)
+(require 'timezone)
 
 (defcustom orgmine-issue-title-format
   "[[redmine:issues/%{id}][#%{id}]] %{subject}"
@@ -101,6 +102,7 @@
     (create-me . "CREATE_ME")
     (project . "project")
     (tracker . "tracker")
+    (versions . "versions")
     (version . "version")
     (issue . "issue")
     (description . "description")
@@ -114,6 +116,7 @@
 (defvar orgmine-tag-create-me)
 (defvar orgmine-tag-project)
 (defvar orgmine-tag-tracker)
+(defvar orgmine-tag-versions)
 (defvar orgmine-tag-version)
 (defvar orgmine-tag-issue)
 (defvar orgmine-tag-description)
@@ -436,7 +439,8 @@ plist of PARAMS for the query."
   (mapc (lambda (tag)
 	  (add-to-list 'org-tags-exclude-from-inheritance tag))
 	(list orgmine-tag-update-me orgmine-tag-create-me
-	      orgmine-tag-project orgmine-tag-tracker orgmine-tag-version
+	      orgmine-tag-project orgmine-tag-tracker
+	      orgmine-tag-versions orgmine-tag-version
 	      orgmine-tag-issue
 	      orgmine-tag-description orgmine-tag-journals orgmine-tag-journal
 	      orgmine-tag-wiki orgmine-tag-attachments))
@@ -1507,10 +1511,10 @@ Otherwise, new tree will be inserted at BEG."
 (defun orgmine-update-entry (type entry plist
 				  &optional force property-list extra)
   "Update ENTRY (org-element data) of TYPE per PLIST.
-If the entry of Redmine is not updated last sync and FORCE is nil,
+If the entry of Redmine is not updated since last sync and FORCE is nil,
 the entry is not updated.
 TYPE could be 'issue, 'fixed_version, 'tracker, and 'project.
-Returns non-nil if the entry is  updated."
+Returns non-nil if the entry is updated."
   (let* ((beg (org-element-property :begin entry))
 	 (idname (orgmine-idname plist))
 	 ;; `title-format' is value of one of the following variable:
@@ -1798,7 +1802,7 @@ return the issue number of the current entry."
 
 (defun orgmine-update-issue (issue redmine-issue &optional force)
   "Update the entry of ISSUE (org-element data) per REDMINE-ISSUE.
-If the issue of Redmine is not updated last sync and FORCE is nil,
+If the issue of Redmine is not updated since last sync and FORCE is nil,
 the entry is not updated."
   (orgmine-update-entry
    'issue issue redmine-issue force
@@ -1819,7 +1823,7 @@ the entry is not updated."
 
 (defun orgmine-update-version (version redmine-version &optional force)
   "Update the entry of VERSION (org-element data) per REDMINE-VERSION.
-If the version of Redmine is not updated last sync and FORCE is nil,
+If the version of Redmine is not updated since last sync and FORCE is nil,
 the entry is not updated."
   (orgmine-update-entry
    'fixed_version version redmine-version force
@@ -1827,14 +1831,14 @@ the entry is not updated."
 
 (defun orgmine-update-tracker (tracker redmine-tracker &optional force)
   "Update the entry of TRACKER (org-element data) per REDMINE-TRACKER.
-If the version of Redmine is not updated last sync and FORCE is nil,
+If the version of Redmine is not updated since last sync and FORCE is nil,
 the entry is not updated."
   (orgmine-update-entry
    'tracker tracker redmine-tracker force '(trackers)))
 
 (defun orgmine-update-project (project redmine-project &optional force)
   "Update the entry of PROJECT (org-element data) per REDMINE-PROJECT.
-If the version of Redmine is not updated last sync and FORCE is nil,
+If the version of Redmine is not updated since last sync and FORCE is nil,
 the entry is not updated."
   (orgmine-update-entry
    'project project redmine-project force
@@ -1991,6 +1995,16 @@ The variables to be copies are whose names start with
       (orgmine-update-project project redmine-project force))
     (goto-char beg)))
 
+(defun orgmine-fetch-versions (force)
+  (interactive "P")
+  (let* ((subtree (orgmine-subtree-region))
+	 (beg (car subtree)))
+    (outline-next-heading)
+    (orgmine-insert-all-versions force)
+    (goto-char beg)
+    (orgmine-sync-subtree-recursively (list orgmine-tag-version))
+    (goto-char beg)))
+
 (defun orgmine-fetch (force)
   "Fetch redmine issue, version, tracker, or project in the current position."
   (interactive "P")
@@ -2002,10 +2016,14 @@ The variables to be copies are whose names start with
 	    (let ((tags (org-get-tags)))
 	      (cond ((member orgmine-tag-version tags)
 		     (orgmine-fetch-version force))
+		    ((member orgmine-tag-versions tags)
+		     (orgmine-fetch-versions force))
 		    ((member orgmine-tag-tracker tags)
 		     (orgmine-fetch-tracker force))
 		    ((member orgmine-tag-project tags)
-		     (orgmine-fetch-project force))
+		     (prog1
+			 (orgmine-fetch-project force)
+		       (orgmine-fetch-versions force)))
 		    (t
 		     (orgmine-fetch-issue force)))
 	      (point))))
@@ -2173,8 +2191,9 @@ NB: the attachments is not submitted to the server."
     (unless redmine-version
       (error "Version #%s does not exist on Redmine or some error occurred."
 	     fixed-version))
-    (org-insert-heading arg)
-    (org-toggle-tag orgmine-tag-version 'on)
+;;     (org-insert-heading arg)
+;;     (org-toggle-tag orgmine-tag-version 'on)
+    (orgmine-insert-demoted-heading "" (list orgmine-tag-version))
     (org-set-property "om_fixed_version" fixed-version)
     (let ((version (org-element-at-point)))
       (orgmine-update-version version redmine-version))))
@@ -2771,7 +2790,7 @@ If UPDATE-ONLY is nil, insert issue that does not exist in the buffer."
 in depth first manner."
   (interactive (list nil current-prefix-arg))
   (or tags (setq tags (list orgmine-tag-project orgmine-tag-version
-			    orgmine-tag-tracker)))
+			    orgmine-tag-tracker orgmine-tag-versions)))
   (let* ((region (orgmine-subtree-region))
 	 (beg (car region))
 	 (end (copy-marker (cdr region))))
@@ -2812,6 +2831,18 @@ in depth first manner."
     (message ">>> ending buffer synchronization ------------------------")
     (message
      "check *Messages* buffer for entries that might not be sync'ed.")))
+
+(defun orgmine-sync-all-buffers (&optional force)
+  "Synchronize the whole entries in all of the orgmine buffers."
+  (interactive "P")
+  (save-window-excursion
+    (let ((buffers (org-buffer-list)))
+      (mapc (lambda (buf)
+	      (with-current-buffer buf
+		(when orgmine-mode
+		  (switch-to-buffer buf)
+		  (orgmine-sync-buffer force))))
+	    buffers))))
 
 (defun orgmine-ediff-entry (beg id-prop orgmine-fetch-entry-func
 				&optional show-no-child)
