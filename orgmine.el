@@ -2193,6 +2193,7 @@ NB: the attachments is not submitted to the server."
 	     fixed-version))
 ;;     (org-insert-heading arg)
 ;;     (org-toggle-tag orgmine-tag-version 'on)
+    (move-beginning-of-line nil)
     (orgmine-insert-demoted-heading "" (list orgmine-tag-version))
     (org-set-property "om_fixed_version" fixed-version)
     (let ((version (org-element-at-point)))
