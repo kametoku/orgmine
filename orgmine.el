@@ -491,7 +491,7 @@ plist of PARAMS for the query."
 
 
 (defun orgmine-insert-demoted-heading (&optional title tags-list)
-  "Insert a demoted headling at the beginning of the current line."xo
+  "Insert a demoted headling at the beginning of the current line."
   (move-beginning-of-line nil)
   (if (save-match-data
 	(looking-at "^\\*+ "))
