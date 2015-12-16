@@ -2794,13 +2794,14 @@ in depth first manner."
   (let* ((region (orgmine-subtree-region))
 	 (beg (car region))
 	 (end (copy-marker (cdr region))))
-    (save-excursion
-      (if (org-goto-first-child)
-	  (orgmine-map-region (lambda ()
-				(orgmine-sync-subtree-recursively tags force))
-			      (point) end t)))
-    (if (orgmine-tags-in-tag-p tags (org-get-tags))
-	(orgmine-sync-subtree force))
+    (org-save-outline-visibility t
+      (save-excursion
+	(if (org-goto-first-child)
+	    (orgmine-map-region (lambda ()
+				  (orgmine-sync-subtree-recursively tags force))
+				(point) end t)))
+      (if (orgmine-tags-in-tag-p tags (org-get-tags))
+	  (orgmine-sync-subtree force)))
     (set-marker end nil)
 ;;     (goto-char end)))
     (goto-char beg)))
