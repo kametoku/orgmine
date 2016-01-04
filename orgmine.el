@@ -1920,6 +1920,16 @@ The variables to be copies are whose names start with
 		    (orgmine-id-list-cache-set afile tag id-list)
 		    id-list)))))))))
 
+(defun orgmine-buffer-list ()
+  "Returns the list of orgmine buffers"
+  (let (buffers)
+    (mapc (lambda (buf)
+	    (with-current-buffer buf
+	      (if orgmine-mode
+		  (add-to-list 'buffers buf))))
+	  (org-buffer-list 'agenda t))
+    buffers))
+
 (defun orgmine-archived-issues ()
   (orgmine-archived-ids orgmine-tag-issue 'id))
 
@@ -2192,11 +2202,13 @@ NB: the attachments is not submitted to the server."
 	     fixed-version))
 ;;     (org-insert-heading arg)
 ;;     (org-toggle-tag orgmine-tag-version 'on)
-    (move-beginning-of-line nil)
-    (orgmine-insert-demoted-heading "" (list orgmine-tag-version))
-    (org-set-property "om_fixed_version" fixed-version)
-    (let ((version (org-element-at-point)))
-      (orgmine-update-version version redmine-version))))
+    (org-save-outline-visibility t
+      (show-branches)
+      (move-beginning-of-line nil)
+      (orgmine-insert-demoted-heading "" (list orgmine-tag-version))
+      (org-set-property "om_fixed_version" fixed-version)
+      (let ((version (org-element-at-point)))
+	(orgmine-update-version version redmine-version)))))
 
 (defun orgmine-insert-all-versions (force)
   "Insert all of the Redmine version entries in the current position.
@@ -2421,6 +2433,7 @@ Submitting update of project and tracker is not supported."
 ;; 		     (orgmine-submit-project force))
 		    ((member orgmine-tag-tracker tags))
 		    ((member orgmine-tag-project tags))
+		    ((member orgmine-tag-versions tags))
 		    (t
 		     (orgmine-submit-issue force)))
 	      (point))))
@@ -2678,19 +2691,24 @@ new entry will be inserted into the current position."
 (defun orgmine-get-issues (beg)
   "get issues from redmine on current condition."
   (goto-char beg)
-  (let* ((filters (orgmine-get-filters beg))
-	 (project (plist-get filters :project_id))
-	 ;; XXX: elmine/get-issues does not return issues with journals
-	 ;; even when ':include "journals"' is passed as the parameter.
-	 (redmine-issues
-	  (if (not project)
-	      (error "no project property (project_id) exists")
-	    (message "retrieving issues with filter: %s" filters)
-	    (apply 'elmine/get-project-issues project filters))))
-    (prog1 redmine-issues
-      (if (not redmine-issues)
-	  (message "no issue exists for %s" filters)
-	(message "%d issue(s) retrieved." (length redmine-issues))))))
+  (if (orgmine-tags-in-tag-p (list orgmine-tag-project orgmine-tag-version
+				   orgmine-tag-tracker)
+			     (org-get-tags))
+      (let* ((filters (orgmine-get-filters beg))
+	     (project (plist-get filters :project_id))
+	     ;; XXX: elmine/get-issues does not return issues with journals
+	     ;; even when ':include "journals"' is passed as the parameter.
+	     (redmine-issues
+	      (if (not project)
+		  (error "no project property (project_id) exists")
+		(message "retrieving issues with filter: %s" filters)
+		(apply 'elmine/get-project-issues project filters))))
+	(prog1 redmine-issues
+	  (if (not redmine-issues)
+	      (message "no issue exists for %s" filters)
+	    (message "%d issue(s) retrieved." (length redmine-issues)))))
+;;     (message "not a region for sync issues")
+    nil))
 
 (defun orgmine-collect-issues (beg end redmine-issues
 				   &optional force update-only)
@@ -2769,20 +2787,8 @@ If UPDATE-ONLY is nil, insert issue that does not exist in the buffer."
    (let* ((subtree (orgmine-subtree-region))
 	  (beg (car subtree))
 	  (end (cdr subtree))
-	  (orgmine-ignore-ids (orgmine-archived-issues))
-	  level)
+	  (orgmine-ignore-ids (orgmine-archived-issues)))
      (narrow-to-region beg end)
-     (let ((tree (org-element-parse-buffer)))
-       (org-element-map tree 'headline
-	 (lambda (element)
-	   (org-element-property :level element)
-	   (unless level
-	     (setq level (org-element-property :level element)))
-	   ;; om_version om_project om_tracker
-	   ;; om_issue
-	   ;; om_journals, om_journal, om_description
-	   )))
-     ;;
      (orgmine-sync-region beg end force))))
 
 (defun orgmine-sync-subtree-recursively (&optional tags force)
@@ -2795,6 +2801,7 @@ in depth first manner."
 	 (beg (car region))
 	 (end (copy-marker (cdr region))))
     (org-save-outline-visibility t
+      (show-branches)
       (save-excursion
 	(if (org-goto-first-child)
 	    (orgmine-map-region (lambda ()
@@ -2821,7 +2828,7 @@ in depth first manner."
        ;; sync each subtrees one by one from top to bottom of buffer.
        (goto-char beg)
        (let ((tags (list orgmine-tag-project orgmine-tag-version
-			 orgmine-tag-tracker)))
+			 orgmine-tag-tracker orgmine-tag-versions)))
 	 (while (re-search-forward "^\\* " nil t)
 	   (save-excursion
 	     (orgmine-sync-subtree-recursively tags force))
@@ -2837,12 +2844,10 @@ in depth first manner."
   "Synchronize the whole entries in all of the orgmine buffers."
   (interactive "P")
   (save-window-excursion
-    (let ((buffers (org-buffer-list)))
+    (let ((buffers (orgmine-buffer-list)))
       (mapc (lambda (buf)
-	      (with-current-buffer buf
-		(when orgmine-mode
-		  (switch-to-buffer buf)
-		  (orgmine-sync-buffer force))))
+	      (switch-to-buffer buf)
+	      (orgmine-sync-buffer force))
 	    buffers))))
 
 (defun orgmine-ediff-entry (beg id-prop orgmine-fetch-entry-func
