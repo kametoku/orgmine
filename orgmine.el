@@ -1,6 +1,6 @@
 ;;; orgmine.el --- minor mode for org-mode with redmine integration
 
-;; Copyright (C) 2015 Tokuya Kameshima
+;; Copyright (C) 2015-2016 Tokuya Kameshima
 
 ;; Author: Tokuya Kameshima <kametoku at gmail dot com>
 ;; Keywords: outlines, hypermedia, calendar, wp
@@ -543,7 +543,7 @@ plist of PARAMS for the query."
 	      (setq value (plist-get value (intern (format ":%s" k)))))
 	    key-list)
       value)))
-  
+
 (defun orgmine-format (string plist)
   (with-temp-buffer
     (insert string)
@@ -556,7 +556,7 @@ plist of PARAMS for the query."
 	     (value (orgmine-format-value plist key-str)))
 	(cond ((member key '(:created_on :updated_on :closed_on))
 	       (setq value (orgmine-tz-org-date value))))
-	(replace-match (elmine/ensure-string value) t)))
+	(replace-match (elmine/ensure-string value) t t)))
     (buffer-string)))
 
 (defun orgmine-extract-subject (title)
@@ -2202,13 +2202,12 @@ NB: the attachments is not submitted to the server."
 	     fixed-version))
 ;;     (org-insert-heading arg)
 ;;     (org-toggle-tag orgmine-tag-version 'on)
-    (org-save-outline-visibility t
-      (show-branches)
-      (move-beginning-of-line nil)
-      (orgmine-insert-demoted-heading "" (list orgmine-tag-version))
-      (org-set-property "om_fixed_version" fixed-version)
-      (let ((version (org-element-at-point)))
-	(orgmine-update-version version redmine-version)))))
+    (show-branches)
+    (move-beginning-of-line nil)
+    (orgmine-insert-demoted-heading "" (list orgmine-tag-version))
+    (org-set-property "om_fixed_version" fixed-version)
+    (let ((version (org-element-at-point)))
+      (orgmine-update-version version redmine-version))))
 
 (defun orgmine-insert-all-versions (force)
   "Insert all of the Redmine version entries in the current position.
@@ -2800,15 +2799,14 @@ in depth first manner."
   (let* ((region (orgmine-subtree-region))
 	 (beg (car region))
 	 (end (copy-marker (cdr region))))
-    (org-save-outline-visibility t
-      (show-branches)
-      (save-excursion
-	(if (org-goto-first-child)
-	    (orgmine-map-region (lambda ()
-				  (orgmine-sync-subtree-recursively tags force))
-				(point) end t)))
-      (if (orgmine-tags-in-tag-p tags (org-get-tags))
-	  (orgmine-sync-subtree force)))
+    (show-branches)
+    (save-excursion
+      (if (org-goto-first-child)
+	  (orgmine-map-region (lambda ()
+				(orgmine-sync-subtree-recursively tags force))
+			      (point) end t)))
+    (if (orgmine-tags-in-tag-p tags (org-get-tags))
+	(orgmine-sync-subtree force))
     (set-marker end nil)
 ;;     (goto-char end)))
     (goto-char beg)))
