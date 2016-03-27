@@ -380,7 +380,7 @@ plist of PARAMS for the query."
 
 
 (defun orgmine-server (base-url)
-  "Return the server entry of the Redmine server in `orgmine-servers',
+  "Return the server entry of the Redmine server in `orgmine-servers'
 whose host is BASE-URL."
   (catch 'found
     (mapc (lambda (elem)
@@ -388,6 +388,32 @@ whose host is BASE-URL."
               (if (string= host base-url)
                   (throw 'found elem))))
           orgmine-servers)))
+
+(defun orgmine-parse-issue-url (url)
+  "Parse URL and return a cons (SERVER . ISSUE-ID)."
+  (save-match-data
+    (if (string-match "^\\(http.*\\)/issues/\\([0-9]+\\)" url)
+        ;; redmine url -> orgmine
+        (let* ((base-url (match-string 1 link))
+               (issue-id (match-string 2 link))
+               (server (orgmine-server base-url)))
+          (if server
+              (cons (car server) issue-id))))))
+
+(defun orgmine-issue-buffer (server issue-id &optional title)
+  "Create an orgmine issue buffer."
+  (let* ((bufname (format "*OrgMine-%s:issues/%s*" server issue-id))
+         (buf (get-buffer-create bufname)))
+    (switch-to-buffer buf)
+    (erase-buffer)
+    (if title (insert (format "#+title: %s\n" title)))
+    (insert (format "#+PROPERTY: om_server %s\n\n" server))
+    (set-buffer-file-coding-system 'utf-8)
+    (org-mode)
+    (orgmine-mode t)
+    (orgmine-insert-issue issue-id)
+    (set-buffer-modified-p nil)
+    (message "Editing issue #%s on %s" issue-id server)))
 
 (defun orgmine-tag (key)
   "Return tag."
