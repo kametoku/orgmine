@@ -378,6 +378,17 @@ plist of PARAMS for the query."
 (defalias 'elmine/delete-wiki-page 'orgmine/delete-wiki-page)
 
 
+
+(defun orgmine-server (base-url)
+  "Return the server entry of the Redmine server in `orgmine-servers',
+whose host is BASE-URL."
+  (catch 'found
+    (mapc (lambda (elem)
+            (let ((host (cdr (assoc 'host (cdr elem)))))
+              (if (string= host base-url)
+                  (throw 'found elem))))
+          orgmine-servers)))
+
 (defun orgmine-tag (key)
   "Return tag."
   (cdr (assoc key orgmine-tags)))
