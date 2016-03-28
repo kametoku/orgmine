@@ -406,12 +406,16 @@ whose host is BASE-URL."
          (buf (get-buffer-create bufname)))
     (switch-to-buffer buf)
     (erase-buffer)
-    (if title (insert (format "#+title: %s\n" title)))
+    (if title (insert (format "#+TITLE: %s\n" title)))
     (insert (format "#+PROPERTY: om_server %s\n\n" server))
     (set-buffer-file-coding-system 'utf-8)
     (org-mode)
     (orgmine-mode t)
-    (orgmine-insert-issue issue-id)
+    (save-excursion
+      (orgmine-insert-issue issue-id))
+    (hide-subtree)
+    (show-branches)
+    (org-align-all-tags)
     (set-buffer-modified-p nil)
     (message "Editing issue #%s on %s" issue-id server)))
 
@@ -531,7 +535,7 @@ whose host is BASE-URL."
   "Insert a demoted headling at the beginning of the current line."
   (move-beginning-of-line nil)
   (if (save-match-data
-	(looking-at "^\\*+ "))
+	(or (looking-at "^\\*+ ") (eobp)))
       (open-line 1))
   (outline-insert-heading)
   (org-do-demote)
@@ -1394,12 +1398,13 @@ the new entry will be inserted as the child entry of the current headline."
       (when insert
 	(goto-char beg)
 	(outline-next-heading)
-	(orgmine-insert-demoted-heading "Journals\n"
+	(orgmine-insert-demoted-heading "Journals"
 					(list orgmine-tag-journals))
+        (outline-next-heading)
 	(if (and (markerp end)
 		 (> (point) end))
 	    (set-marker end (point)))))))
-  
+
 (defun orgmine-insert-journals (redmine-journals beg end)
   "Insert journals subtree between region from BEG to END.
 If the journals headline already exits, the tree will be updated.
