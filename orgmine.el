@@ -50,52 +50,69 @@
 (require 'org-archive)
 (require 'timezone)
 
+(defgroup orgmine nil
+  "Options concerning orgmie minor mode."
+  :tag "Org Mine"
+  :group 'org)
+
 (defcustom orgmine-issue-title-format
   "[[redmine:issues/%{id}][#%{id}]] %{subject}"
-  "Title format for issue entry.")
+  "Title format for issue entry."
+  :group 'orgmine)
 
 (defcustom orgmine-journal-title-format
   "[[redmine:issues/%{id}#note-%{count}][V#%{id}-%{count}]] %{created_on} %{author}"
-  "Title format for journal entry.")
+  "Title format for journal entry."
+  :group 'orgmine)
 
 (defcustom orgmine-version-title-format
   "[[redmine:versions/%{id}][V#%{id}]] %{name}"
-  "Title format for version entry.")
+  "Title format for version entry."
+  :group 'orgmine)
 
 (defcustom orgmine-tracker-title-format "%{name}"
-  "Title format for tracker entry.")
+  "Title format for tracker entry."
+  :group 'orgmine)
 
 (defcustom orgmine-project-title-format
   "[[redmine:projects/%{identifier}][%{identifier}]] %{name}"
-  "Title format for project entry.")
+  "Title format for project entry."
+  :group 'orgmine)
 
 (defcustom orgmine-wiki-page-title-format
   "[[redmine:projects/%{project}/wiki/%{title}][%{title}]]"
-  "Title format for wiki page entry.")
+  "Title format for wiki page entry."
+  :group 'orgmine)
 
 (defcustom orgmine-title-format-regexp
   (let ((brackert-link-regexp
 	 "\\[\\[\\(?:[^][]+\\)\\]\\(?:\\[\\(?:[^][]+\\)\\]\\)?\\]"))
     (concat "^[ \t]*" brackert-link-regexp "[ \t]*\\(.*?\\)"
 	    "[ \t]*\\(?:(" brackert-link-regexp ")\\)?$"))
-  "Regular express to extract subject part from headline title.")
+  "Regular express to extract subject part from headline title."
+  :group 'orgmine)
 
 (defcustom orgmine-user-name-format "%{firstname} %{lastname}"
-  "User name format.")
+  "User name format."
+  :group 'orgmine)
 
 (defcustom orgmine-attachment-format
   (concat "[[%{content_url}][%{filename}]] (%{filesize} bytes)"
 	  " %{author.name} %{created_on}")
-  "attachment item format.")
+  "attachment item format."
+  :group 'orgmine)
 
 (defcustom orgmine-journal-details-drawer "DETAILS"
-  "Drawer name to hold journal details.")
+  "Drawer name to hold journal details."
+  :group 'orgmine)
 
 (defcustom orgmine-note-block-begin "#+begin_src gfm"
-  "")
+  ""
+  :group 'orgmine)
 
 (defcustom orgmine-note-block-end "#+end_src"
-  "")
+  ""
+  :group 'orgmine)
 
 (defcustom orgmine-tags
   '((update-me . "UPDATE_ME")
@@ -110,7 +127,8 @@
     (journal . "journal")
     (attachments . "attachments")
     (wiki . "wiki"))
-  "Alist of tags which are used in orgmine mode.")
+  "Alist of tags which are used in orgmine mode."
+  :group 'orgmine)
 
 (defvar orgmine-tag-update-me)
 (defvar orgmine-tag-create-me)
@@ -148,7 +166,13 @@
      (project-title-format . "[\[localhost:projects/%{identifier}][%{name}]]")
      (user-name-format . "%{firstname} %{lastname}")))
   "An alist of redmine servers.
-Each element has the form (NAME CONFIGURATION).")
+Each element has the form (NAME CONFIGURATION)."
+  :group 'orgmine)
+
+(defcustom orgmine-issue-buffer-hook nil
+  "Hook called in `orgmine-issue-buffer'."
+  :group 'orgmine
+  :type 'hook)
 
 ;; ;; workaround for decode the returned string as utf-8
 ;; (defadvice json-read-string (around json-read-string-decode activate)
@@ -417,6 +441,7 @@ whose host is BASE-URL."
     (show-branches)
     (org-align-all-tags)
     (set-buffer-modified-p nil)
+    (run-hooks 'orgmine-issue-buffer-hook)
     (message "Editing issue #%s on %s" issue-id server)))
 
 (defun orgmine-tag (key)
