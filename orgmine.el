@@ -169,6 +169,11 @@
 Each element has the form (NAME CONFIGURATION)."
   :group 'orgmine)
 
+(defcustom orgmine-setup-hook nil
+  "Hook called in `orgmine-setup'."
+  :group 'orgmine
+  :type 'hook)
+
 (defcustom orgmine-issue-buffer-hook nil
   "Hook called in `orgmine-issue-buffer'."
   :group 'orgmine
@@ -203,7 +208,7 @@ Each element has the form (NAME CONFIGURATION)."
 ;; =======
         (decode-coding-string (apply 'string (nreverse characters))
 			      'utf-8)
-;; >>>kame     
+;; >>>kame
       "")))
 
 (defalias 'json-read-string 'orgmine/json-read-string)
@@ -246,7 +251,7 @@ plist of PARAMS for the query."
 ;; =======
 	;; the body part is encoded in utf-8.
         (setq body (buffer-substring header-end (point-max))))
-;; >>>kame     
+;; >>>kame
       (kill-buffer))
     `(:status ,status
       :header ,header
@@ -487,7 +492,8 @@ whose host is BASE-URL."
 			(orgmine-setup-custom-fields value)))
 		(message "orgmine-setup: %s: skipped - invalid name" key))))
 	  config))
-  (orgmine-setup-tags))
+  (orgmine-setup-tags)
+  (run-hook 'orgmine-setup-hook))
 
 (defvar orgmine-mode-map (make-sparse-keymap)
   "Keymap for `orgmine-mode', a minor mode.")
