@@ -24,7 +24,7 @@ available from MELPA.  Install these packages as well.
 ** Download and put orgmine.el to a directory in `load-path'.
 
 The latest version of =orgmine.el= is available from:
-http://github.com/kametoku/orgmine
+https://github.com/kametoku/orgmine
 
 ** Edit your ~/.emacs
 
@@ -67,7 +67,8 @@ Prior to do this, please get the API key of the redmine REST API.
            (version-title-format . "[[redmine:versions/%{id}][V#%{id}]] %{name}")
            (tracker-title-format . "%{name}")
            (project-title-format . "[[redmine:projects/%{identifier}][%{identifier}]] %{name}")
-           (user-name-format . "%{firstname} %{lastname}"))))
+           (user-name-format . "%{firstname} %{lastname}")
+           (default-todo-keyword . "NEW"))))
 #+end_src
 
 | Key                  | variable to define default   | Description             |
