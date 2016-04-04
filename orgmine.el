@@ -154,7 +154,8 @@
      (tracker-title-format . "%{name}")
      (project-title-format
       . "[[redmine:projects/%{identifier}][%{identifier}]] %{name}")
-     (user-name-format . "%{firstname} %{lastname}"))
+     (user-name-format . "%{firstname} %{lastname}")
+     (default-todo-keyword . "New"))
     ("localhost"
      (hoge)
      (host . "http://localhost:8080/redmine")
@@ -164,7 +165,8 @@
       . "[\[localhost:issues/%{id}#note-%{count}][V#%{id}-%{count}]] %{created_on} %{author}")
      (version-title-format . "[\[localhost:versions/%{id}][V#%{id}]] %{name}")
      (project-title-format . "[\[localhost:projects/%{identifier}][%{name}]]")
-     (user-name-format . "%{firstname} %{lastname}")))
+     (user-name-format . "%{firstname} %{lastname}")
+     (default-todo-keyword . "New")))
   "An alist of redmine servers.
 Each element has the form (NAME CONFIGURATION)."
   :group 'orgmine)
@@ -471,7 +473,7 @@ whose host is BASE-URL."
 (defvar orgmine-valid-variables
   '(host api-key issue-title-format journal-title-format version-title-format
 	 tracker-title-format project-title-format wiki-page-title-format
-	 user-name-format custom-fields))
+	 user-name-format custom-fields default-todo-keyword))
 
 (defun orgmine-setup ()
   "Setup buffer local variables from ORGMINE-SERVERS per om_server property."
@@ -493,7 +495,7 @@ whose host is BASE-URL."
 		(message "orgmine-setup: %s: skipped - invalid name" key))))
 	  config))
   (orgmine-setup-tags)
-  (run-hook 'orgmine-setup-hook))
+  (run-hooks 'orgmine-setup-hook))
 
 (defvar orgmine-mode-map (make-sparse-keymap)
   "Keymap for `orgmine-mode', a minor mode.")
@@ -527,6 +529,7 @@ whose host is BASE-URL."
   (define-key orgmine-mode-map "\C-cmi" 'orgmine-add-issue)
   (define-key orgmine-mode-map "\C-cmI" 'orgmine-insert-issue)
   (define-key orgmine-mode-map "\C-cmj" 'orgmine-add-journal)
+  (define-key orgmine-mode-map "\C-cmk" 'orgmine-skeletonize-subtree)
   (define-key orgmine-mode-map "\C-cmp" 'orgmine-add-project)
   (define-key orgmine-mode-map "\C-cmP" 'orgmine-insert-project)
   (define-key orgmine-mode-map "\C-cms" 'orgmine-sync-subtree-recursively)
@@ -720,6 +723,16 @@ If not found and NO-ERROR, return nil.  Otherwise, raise an error."
      (unless no-error
        (error "No redmine %s headline found" tag)))))
 
+(defun orgmine-delete-headline (tag &optional end only-same-level)
+  "Search forward from point for headline with TAG
+within the region between the current position and END.
+If the headline is found, delete the subtree of the headline."
+  (save-excursion
+    (while (orgmine-find-headline tag end only-same-level)
+      (let ((region (orgmine-subtree-region)))
+        (delete-region (car region) (cdr region)))
+      (outline-next-heading))))
+
 (defun orgmine-note (headline)
   "return note in src-block element."
   (save-excursion
@@ -832,6 +845,12 @@ or move to current issuen headline."
   "Convert Redmine REST API property name to org-mode property name."
   (format "om_%s" key))
 
+(defun orgmine-prop (property)
+  ;; "trcker" -> :tracker_id
+  (intern (format (if (orgmine-id-property-p property)
+                      ":%s_id" ":%s")
+                  property)))
+
 (defun orgmine-name (plist &optional format escape)
   (let ((name (if format
 		  (orgmine-format format plist)
@@ -844,9 +863,10 @@ or move to current issuen headline."
   ;; plist -> "ID:NAME"
   (let ((id (plist-get plist :id))
 	(name (orgmine-name plist format escape)))
-    (if name
-	(format "%s:%s" id name)
-      (elmine/ensure-string id))))
+    (cond ((and id name)
+           (format "%s:%s" id name))
+          (id
+           (elmine/ensure-string id)))))
 
 (defun orgmine-delete-properties (pom regexp)
   "Delete entry properties at POM which match REGEXP."
@@ -954,10 +974,11 @@ or move to current issuen headline."
 Only the properties provided in PROPERTY-LIST are updated."
   (mapc (lambda (key)
 	  (let* ((name (orgmine-property-name key))
-		 (prop (intern (format ":%s" key)))
-		 (value (if (eq key type)
-			    (orgmine-idname redmine-issue)
-			  (plist-get redmine-issue prop))))
+;; 		 (prop (intern (format ":%s" key)))
+		 (prop (orgmine-prop key))
+		 (value (cond ((and (eq key type)
+                                    (orgmine-idname redmine-issue)))
+                              (t (plist-get redmine-issue prop)))))
 	    ;; TODO: timestamp conversion:
 	    ;;       yyyy-mm-dd -> [yyyy-mm-dd xxx]
 	    (cond ((eq key 'custom_fields)
@@ -1061,7 +1082,8 @@ from the headline property drawer."
 				 &optional properties inherit for-filter)
   (cond
    ((eq property 'custom_fields)
-    (let ((custom-fields (orgmine-get-property-custom-fields pom)))
+    (let ((custom-fields (and (boundp 'orgmine-custom-fields)
+                              (orgmine-get-property-custom-fields pom))))
       (if custom-fields (list :custom_fields custom-fields))))
    ((eq property 'relations)
     (let ((relations (orgmine-get-property-relations pom)))
@@ -1130,6 +1152,8 @@ Only the properties given by PROPERTY-LIST are retrieved."
 	    (point)))))
 
 (defun orgmine-entry-region ()
+  "Returns the region from the beginning of headline to the next headline
+as a cons cell (BEG . END)."
   (save-excursion
     (cons (progn
 	    (org-back-to-heading t)
@@ -1139,6 +1163,36 @@ Only the properties given by PROPERTY-LIST are retrieved."
 ;; 	    (if (and (org-at-heading-p) (not (eobp))) (backward-char 1))
 	    (if (org-at-heading-p) (backward-char 1))
 	    (point)))))
+
+(defun orgmine-body-region ()
+  "Returns the region from the beginning of body to the next headline
+as a cons cell (BEG . END)."
+  (org-back-to-heading t)
+  (show-subtree)
+  (save-excursion
+    (forward-line)
+    (if (not (org-at-heading-p t))
+        (cons (point)
+              (or (outline-next-heading) (point-max))))))
+
+(defun orgmine-default-todo-keyword ()
+  "Returns the default TODO keyword for the initial status of Redmine issue.
+The default TODO keyword can be specified by \"om_default_todo\" property,
+such as \"#+PROPERTY: om_default_todo NEW\".
+If the property is not found, the first TODO keyword of `org-todo-keywords-1'
+is returned."
+  (or (cdr (assoc-string "om_default_todo" org-file-properties))
+      orgmine-default-todo-keyword
+      (nth 0 org-todo-keywords-1)
+      1))
+
+(defun orgmine-todo (keyword)
+  "Set the TODO state to KEYWORD."
+  (let ((org-after-todo-state-change-hook
+         org-after-todo-state-change-hook))
+    (remove-hook 'org-after-todo-state-change-hook
+                 'orgmine-after-todo-state-change)
+    (org-todo keyword)))
 
 (defun orgmine-collect-update-plist (issue &optional subject-prop)
   "collect updating entries and return them as plist"
@@ -1527,11 +1581,7 @@ Otherwise, new tree will be inserted at BEG."
 	(org-toggle-tag org-archive-tag 'on)
       (org-toggle-tag org-archive-tag 'off))
     (if status-name			; for issue entry
-	(let ((org-after-todo-state-change-hook
-	       org-after-todo-state-change-hook))
-	  (remove-hook 'org-after-todo-state-change-hook
-		       'orgmine-after-todo-state-change)
-	  (org-todo status-name)))
+        (orgmine-todo status-name))
     (if start-date			; SCHEDULED: prop
 	(org-add-planning-info 'scheduled start-date)
       (org-remove-timestamp-with-keyword org-scheduled-string))
@@ -2133,12 +2183,7 @@ The variables to be copies are whose names start with
 NB: the issue is not submitted to the server."
   (interactive "P")
   (org-insert-heading arg)
-;;   (org-todo 1)
-  (let ((org-after-todo-state-change-hook
-	 org-after-todo-state-change-hook))
-    (remove-hook 'org-after-todo-state-change-hook
-		 'orgmine-after-todo-state-change)
-    (org-todo 1))
+  (orgmine-todo (orgmine-default-todo-keyword))
   (let ((pos (point)))
     (org-toggle-tag orgmine-tag-issue 'on)
     (org-toggle-tag orgmine-tag-create-me 'on)
@@ -2906,7 +2951,8 @@ in depth first manner."
 	   (outline-next-heading)))
        ;;
        (goto-char beg)
-       (orgmine-sync-issues beg end force t)))
+       (orgmine-sync-issues beg end force t)
+       (set-marker end nil)))
     (message ">>> ending buffer synchronization ------------------------")
     (message
      "check *Messages* buffer for entries that might not be sync'ed.")))
@@ -3088,6 +3134,107 @@ Then entry could be an issue, version, tracker or project."
     (insert "#+PROPERTY: om_done_ration_ALL "
 	    "0 10 20 30 40 50 60 70 80 90 100\n")
     (orgmine-insert-custom-fields-property-template project)))
+
+;;;;
+
+;; (defun orgmine-body-block-before-subtree ()
+;;   (org-back-to-heading t)
+;;   (show-subtree)
+;;   (save-excursion
+;;     (forward-line)
+;;     (if (not (org-at-heading-p t))
+;;         (cons (point)
+;;               (outline-next-heading)))))
+
+(defun orgmine-skeletonize-headline (type property-list todo-keyword)
+  "Make the current headline into a skeleton headline.
+TYPE is any of 'issue, 'fixed_version, 'tracker, 'project.
+All properties are removed but PROPERTY-LIST.
+If TODO-KEYWORD is not null, set TODO Keyword to TODO-KEYWORD."
+  (unless (org-at-heading-p t) (error "not a headline."))
+  (show-subtree)
+  (let ((properties (orgmine-get-properties nil property-list))
+        (title (orgmine-extract-subject
+                (substring-no-properties (org-get-heading t t))))
+;;         (block (orgmine-body-block-before-subtree)))
+        (block (orgmine-body-region)))
+    (if block
+        (delete-region (car block) (cdr block)))
+    (orgmine-update-title title)
+    (org-toggle-tag org-archive-tag 'off)
+    (org-toggle-tag orgmine-tag-create-me 'on)
+    (orgmine-set-properties type properties property-list)
+    (if todo-keyword
+        (orgmine-todo todo-keyword))))
+
+(defun orgmine-skeletonize-issue (property-list)
+  "Make the current issuen entry into a skeleton entry."
+  (or property-list
+      (setq property-list '(tracker assigned_to custom_fields)))
+  (orgmine-current-issue-heading)
+  (orgmine-skeletonize-headline 'issue property-list
+                                (orgmine-default-todo-keyword))
+  ;; remove attachment node and journals node
+  (let* ((subtree (orgmine-subtree-region))
+         (beg (car subtree))
+         (end (copy-marker (cdr subtree))))
+    (org-goto-first-child)
+    (orgmine-delete-headline orgmine-tag-attachments end t)
+    (orgmine-delete-headline orgmine-tag-journals end t)
+    (set-marker end nil)
+    (goto-char beg)))
+
+(defun orgmine-skeletonize-version (property-list)
+  "Make the current issuen entry into a skeleton entry."
+  (let ((version (orgmine-find-headline-ancestor orgmine-tag-version)))
+    (goto-char (org-element-property :begin version)))
+  (orgmine-skeletonize-headline 'fixed_version property-list nil))
+
+(defun orgmine-skeletonize-tracker (property-list)
+  "Make the current tracker entry into a skeleton entry."
+  (or property-list
+      (setq property-list '(tracker)))
+  (let ((tracker (orgmine-find-headline-ancestor orgmine-tag-tracker)))
+    (goto-char (org-element-property :begin tracker)))
+  (orgmine-skeletonize-headline 'tracker property-list nil))
+
+(defun orgmine-skeletonize-project (property-list)
+  "Make the current project entry into a skeleton entry."
+  (let ((project (orgmine-find-headline-ancestor orgmine-tag-project)))
+    (goto-char (org-element-property :begin project)))
+  (orgmine-skeletonize-headline 'project property-list nil))
+
+(defun orgmine-skeletonize-region (beg end arg)
+  (interactive "r\nP")
+  (if (and (org-called-interactively-p 'interactive)
+	   (not (org-region-active-p)))
+      (error "region not active"))
+  (setq end (copy-marker end))
+  (org-with-wide-buffer
+   (goto-char beg)
+   (show-subtree)
+   (while (re-search-forward "^\\*+ " end t)
+     (save-excursion
+       (let ((tags (org-get-tags)))
+         (cond ((member orgmine-tag-issue tags)
+                (orgmine-skeletonize-issue nil))
+               ((member orgmine-tag-version tags)
+                (orgmine-skeletonize-version nil))
+               ((member orgmine-tag-tracker tags)
+                (orgmine-skeletonize-tracker nil))
+               ((member orgmine-tag-project tags)
+                (orgmine-skeletonize-project nil)))))
+     (outline-next-heading))
+   (set-marker end nil)
+   (goto-char beg)))
+
+(defun orgmine-skeletonize-subtree (arg)
+  "Skeletonize the current subtree."
+  (interactive "P")
+  (let* ((subtree (orgmine-subtree-region))
+         (beg (car subtree))
+         (end (cdr subtree)))
+    (orgmine-skeletonize-region beg end arg)))
 
 
 ;;;;
