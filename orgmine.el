@@ -974,8 +974,8 @@ or move to current issuen headline."
 Only the properties provided in PROPERTY-LIST are updated."
   (mapc (lambda (key)
 	  (let* ((name (orgmine-property-name key))
-;; 		 (prop (intern (format ":%s" key)))
-		 (prop (orgmine-prop key))
+		 (prop (intern (format ":%s" key)))
+;; 		 (prop (orgmine-prop key))
 		 (value (cond ((and (eq key type)
                                     (orgmine-idname redmine-issue)))
                               (t (plist-get redmine-issue prop)))))
