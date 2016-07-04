@@ -1662,7 +1662,8 @@ Returns non-nil if the entry is updated."
 	 (show-subtree)
 	 (orgmine-update-title title)
 	 (goto-char beg)
-	 (org-toggle-tag orgmine-tag-update-me 'off)
+         (if (member orgmine-tag-update-me (org-get-tags))
+             (org-toggle-tag orgmine-tag-update-me 'off))
 	 (orgmine-set-properties type plist property-list)
 	 ;; Update SCHEDULED:, DEADLINE:, TODO keyword, and CLOSED:
 	 ;; per redmine properties.
@@ -2271,7 +2272,8 @@ NB: the description is not submitted to the server."
 	      (orgmine-insert-note "" t))
 	    (message "description entry already exist."))
 	(orgmine-insert-description "" beg end t)
-	(org-toggle-tag orgmine-tag-update-me 'on)))
+        (unless (member orgmine-tag-update-me (org-get-tags))
+          (org-toggle-tag orgmine-tag-update-me 'on))))
     (set-marker end nil)))
 
 (defun orgmine-find-attachments (end)
