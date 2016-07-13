@@ -117,6 +117,7 @@
 (defcustom orgmine-tags
   '((update-me . "UPDATE_ME")
     (create-me . "CREATE_ME")
+    (refile-me . "REFILE_ME")
     (project . "project")
     (tracker . "tracker")
     (versions . "versions")
@@ -132,6 +133,7 @@
 
 (defvar orgmine-tag-update-me)
 (defvar orgmine-tag-create-me)
+(defvar orgmine-tag-refile-me)
 (defvar orgmine-tag-project)
 (defvar orgmine-tag-tracker)
 (defvar orgmine-tag-versions)
@@ -512,7 +514,7 @@ whose host is BASE-URL."
       (add-to-list 'org-drawers orgmine-journal-details-drawer))
   (mapc (lambda (tag)
 	  (add-to-list 'org-tags-exclude-from-inheritance tag))
-	(list orgmine-tag-update-me orgmine-tag-create-me
+	(list orgmine-tag-update-me orgmine-tag-create-me orgmine-tag-refile-me
 	      orgmine-tag-project orgmine-tag-tracker
 	      orgmine-tag-versions orgmine-tag-version
 	      orgmine-tag-issue
@@ -532,6 +534,7 @@ whose host is BASE-URL."
   (define-key orgmine-mode-map "\C-cmk" 'orgmine-skeletonize-subtree)
   (define-key orgmine-mode-map "\C-cmp" 'orgmine-add-project)
   (define-key orgmine-mode-map "\C-cmP" 'orgmine-insert-project)
+  (define-key orgmine-mode-map "\C-cmr" 'orgmine-refile-me)
   (define-key orgmine-mode-map "\C-cms" 'orgmine-sync-subtree-recursively)
   (define-key orgmine-mode-map "\C-cmS" 'orgmine-sync-buffer)
   (define-key orgmine-mode-map "\C-cmT" 'orgmine-insert-tracker)
@@ -560,6 +563,7 @@ whose host is BASE-URL."
   (define-key orgmine-mode-map "\C-cm/t" 'orgmine-show-trackers)
   (define-key orgmine-mode-map "\C-cm/u" 'orgmine-show-create-or-update)
   (define-key orgmine-mode-map "\C-cm/v" 'orgmine-show-versions)
+  (define-key orgmine-mode-map "\C-cm/w" 'orgmine-show-refile)
   (define-key orgmine-mode-map "\C-cm?" 'orgmine-ediff)
   (add-hook 'org-after-todo-state-change-hook 'orgmine-after-todo-state-change)
   )
@@ -1578,8 +1582,8 @@ Otherwise, new tree will be inserted at BEG."
 	 (closed-on (plist-get redmine-issue :closed_on))
 	 (estimated-hours (plist-get redmine-issue :estimated_hours)))
     (if (equal status "closed")		; for version entry
-	(org-toggle-tag org-archive-tag 'on)
-      (org-toggle-tag org-archive-tag 'off))
+	(orgmine-toggle-tag org-archive-tag 'on)
+      (orgmine-toggle-tag org-archive-tag 'off))
     (if status-name			; for issue entry
         (orgmine-todo status-name))
     (if start-date			; SCHEDULED: prop
@@ -1662,8 +1666,7 @@ Returns non-nil if the entry is updated."
 	 (show-subtree)
 	 (orgmine-update-title title)
 	 (goto-char beg)
-         (if (member orgmine-tag-update-me (org-get-tags))
-             (org-toggle-tag orgmine-tag-update-me 'off))
+         (orgmine-toggle-tag orgmine-tag-update-me 'off)
 	 (orgmine-set-properties type plist property-list)
 	 ;; Update SCHEDULED:, DEADLINE:, TODO keyword, and CLOSED:
 	 ;; per redmine properties.
@@ -2059,6 +2062,15 @@ The variables to be copies are whose names start with
 
 (defun orgmine-archived-versions ()
   (orgmine-archived-ids orgmine-tag-version 'fixed_version))
+
+(defun orgmine-toggle-tag (tag onoff)
+  (cond ((eq onoff 'on)
+         (or (member tag (org-get-tags))
+             (org-toggle-tag tag 'on)))
+        ((eq onoff 'off)
+         (and (member tag (org-get-tags))
+              (org-toggle-tag tag 'off)))
+        (t (org-toggle-tag tag onoff))))
 
 
 ;;; Interactive Functions
@@ -2623,6 +2635,36 @@ found in the region from BEG to END."
 
 ;;;;
 
+(defun orgmine-refile-me (&optional args)
+  "Tag \"REFILE_ME\" on issue entries that need to be refiled."
+  (interactive "P")
+  (save-excursion
+    (goto-char (point-min))
+    ;; compare issue's properties and parent properties
+    (let ((property-list '(tracker fixed_version project)))
+      (while (orgmine-find-headline orgmine-tag-issue)
+        (if (> (funcall outline-level) 1)
+            (let* ((my-plist (orgmine-get-properties nil property-list))
+                   (parent (save-excursion
+                             (outline-up-heading 1 t)
+                             (point)))
+                   (parent-plist (orgmine-get-properties parent
+                                                         property-list)))
+              (mapc (lambda (property)
+                      (let* ((id-property-p (orgmine-id-property-p property))
+                             (prop (intern (format (if id-property-p
+                                                       ":%s_id" ":%s")
+                                                   property)))
+                             (mine (plist-get my-plist prop))
+                             (parent (plist-get parent-plist prop)))
+                        (if (and mine parent
+                                 (not (equal mine parent)))
+                            (orgmine-toggle-tag orgmine-tag-refile-me 'on)
+                          (orgmine-toggle-tag orgmine-tag-refile-me 'off))))
+                    property-list)))
+        (outline-next-heading))))
+  (orgmine-show-refile))
+
 (defun orgmine-refile (&optional goto default-buffer)
   "Move the current issue entry to another heading."
   (interactive "P")
@@ -2641,7 +2683,8 @@ found in the region from BEG to END."
 	(mapc (lambda (property)
 		(org-entry-delete nil property))
 	      '("om_project" "om_fixed_version" "om_tracker"))
-	(org-toggle-tag orgmine-tag-update-me 'on)))))
+        (org-toggle-tag orgmine-tag-update-me 'on)
+	(org-toggle-tag orgmine-tag-refile-me 'off)))))
 
 ;;;;
 
@@ -2731,6 +2774,11 @@ found in the region from BEG to END."
   (orgmine-match-sparse-tree nil (format "%s|%s" orgmine-tag-create-me
 					 orgmine-tag-update-me)
 			     "entries to create or to update"))
+
+(defun orgmine-show-refile (&optional arg)
+  "Show entries to refile."
+  (interactive "P")
+  (orgmine-match-sparse-tree nil orgmine-tag-refile-me "entries to refile"))
 
 (defun orgmine-show-assigned-to (who todo-only)
   "Show entries assigned to WHO."
@@ -3177,6 +3225,8 @@ If TODO-KEYWORD is not null, set TODO Keyword to TODO-KEYWORD."
     (orgmine-update-title title)
     (org-toggle-tag org-archive-tag 'off)
     (org-toggle-tag orgmine-tag-create-me 'on)
+    (org-toggle-tag orgmine-tag-update-me 'off)
+    (org-toggle-tag orgmine-tag-refile-me 'off)
     (orgmine-set-properties type properties property-list)
     (if todo-keyword
         (orgmine-todo todo-keyword))))
@@ -3257,7 +3307,7 @@ If TODO-KEYWORD is not null, set TODO Keyword to TODO-KEYWORD."
   (when (and (boundp 'orgmine-tag-issue)
 	     (boundp 'orgmine-tag-update-me)
 	     (member orgmine-tag-issue (org-get-tags)))
-    (org-toggle-tag orgmine-tag-update-me 'on)
+    (orgmine-toggle-tag orgmine-tag-update-me 'on)
     (message "run M-x orgmine-submit to send the changes to Redmine server.")))
 ;; (defun orgmine-after-todo-state-change ()
 ;;   (if (and (org-called-interactively-p 'interactive) ; XXX
