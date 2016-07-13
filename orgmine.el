@@ -829,7 +829,7 @@ Return value: (DESCRIPTION JOURNAL ATTACHMENTS)"
 
 (defun orgmine-current-entry-heading (&optional no-error)
   "Move to the beginning of current entry headline
-or move to current issuen headline."
+or move to current issue headline."
   (condition-case err
       (org-back-to-heading)
     (error (unless no-error (error (nth 1 err)))))
@@ -1817,7 +1817,7 @@ Will you force to update entry #%s? %s" id id plist))
 
 (defun orgmine-current-issue ()
   "Return the number that point is on as a string.
-If no number is on the position and the position is under the issuen entry,
+If no number is on the position and the position is under the issue entry,
 return the issue number of the current entry."
   (or (save-match-data
 	;; XXX
@@ -2778,7 +2778,7 @@ found in the region from BEG to END."
       filters)))
 
 (defun orgmine-update-issue-maybe (id beg end)
-  "Update issuen entry and return non-nil if it exists in the buffer.
+  "Update issue entry and return non-nil if it exists in the buffer.
 Otherwise, return nil."
   (goto-char beg)
   (let* ((issue (and (orgmine-find-issue id end)
@@ -3170,7 +3170,7 @@ If TODO-KEYWORD is not null, set TODO Keyword to TODO-KEYWORD."
         (orgmine-todo todo-keyword))))
 
 (defun orgmine-skeletonize-issue (property-list)
-  "Make the current issuen entry into a skeleton entry."
+  "Make the current issue entry into a skeleton entry."
   (or property-list
       (setq property-list '(tracker assigned_to custom_fields)))
   (orgmine-current-issue-heading)
@@ -3187,7 +3187,7 @@ If TODO-KEYWORD is not null, set TODO Keyword to TODO-KEYWORD."
     (goto-char beg)))
 
 (defun orgmine-skeletonize-version (property-list)
-  "Make the current issuen entry into a skeleton entry."
+  "Make the current issue entry into a skeleton entry."
   (let ((version (orgmine-find-headline-ancestor orgmine-tag-version)))
     (goto-char (org-element-property :begin version)))
   (orgmine-skeletonize-headline 'fixed_version property-list nil))
