@@ -2790,6 +2790,17 @@ Otherwise, return nil."
 	  (add-to-list 'orgmine-ignore-ids id)
 	  (point)))))
 
+(defun orgmine-update-issue-all-maybe (id &optional beg end)
+  "Update all issue entries for ID and return non-nil
+if it exists in the buffer.  Otherwise, return nil."
+  (goto-char (or beg (setq begin (point-min))))
+  (setq end (copy-marker (or end (point-max))))
+  (let (found pos)
+    (while (orgmine-update-issue-maybe id (point) end)
+      (setq found t)
+      (outline-next-heading))
+    found))
+
 (defun orgmine-insert-or-update-issue (id-list end force)
   "Insert or update the issue entries of ID-LIST.
 If the issue entry does not exist after the current position,
@@ -2797,7 +2808,8 @@ new entry will be inserted into the current position."
   (let ((beg (point)))
     (mapc (lambda (id)
 	    (or (member id orgmine-ignore-ids)
-		(orgmine-update-issue-maybe id beg end)
+;; 		(orgmine-update-issue-maybe id beg end)
+		(orgmine-update-issue-all-maybe id)
 		(progn
 		  ;; insert issue as new entry.
 		  (goto-char beg)
