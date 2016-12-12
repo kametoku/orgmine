@@ -2054,7 +2054,7 @@ The variables to be copies are whose names start with
 	    (with-current-buffer buf
 	      (if orgmine-mode
 		  (add-to-list 'buffers buf))))
-	  (org-buffer-list 'agenda t))
+	  (org-buffer-list 'files t))
     buffers))
 
 (defun orgmine-archived-issues ()
