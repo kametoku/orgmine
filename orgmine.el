@@ -4,7 +4,7 @@
 
 ;; Author: Tokuya Kameshima <kametoku at gmail dot com>
 ;; Keywords: outlines, hypermedia, calendar, wp
-;; Homepage: http://github.com/kametoku/orgmine
+;; Homepage: https://github.com/kametoku/orgmine
 
 ;; This file is not part of GNU Emacs.
 ;;
@@ -45,6 +45,8 @@
 ;;; Code:
 
 (require 'elmine)
+(require 'request)
+(require 'json)
 (require 's)
 (require 'org)
 (require 'org-archive)
@@ -159,7 +161,6 @@
      (user-name-format . "%{firstname} %{lastname}")
      (default-todo-keyword . "New"))
     ("localhost"
-     (hoge)
      (host . "http://localhost:8080/redmine")
      (api-key . "XXX")
      (issue-title-format . "[\[localhost:issues/%{id}][#%{id}]] %{subject}")
@@ -183,6 +184,119 @@ Each element has the form (NAME CONFIGURATION)."
   :group 'orgmine
   :type 'hook)
 
+
+;;
+;; for Redmine REST API (replacement of elmine.el, in the future)
+;; Use request.el for the backend http protocol.
+;; You can use curl command line program if it is installed.
+;;
+
+(defun orgmine/api-json-read ()
+  "Parse and return the JSON object following point.
+Advance point just past JSON object."
+  (json-skip-whitespace)
+  (unless (eq (json-peek) :json-eof)
+    (let ((json-object-type 'plist)
+          (json-array-type 'list))
+      (json-read))))
+
+(defun orgmine/api-decode (json-string)
+  "Parse a JSON string JSON-STRING and return an object.
+Per default JSON objects are going to be hashtables and JSON
+arrays are going to be lists."
+  (unless (or (null json-string)
+              (string= json-string ""))
+    (let ((json-object-type 'plist)
+          (json-array-type 'list))
+      (json-read-from-string json-string))))
+
+(defun orgmine/api-encode (object)
+  "Return a JSON representation from the given object OBJECT."
+  (let ((json-object-type 'plist)
+        (json-array-type 'list))
+    (json-encode object)))
+
+(defun orgmine/api-build-url (path)
+  (concat orgmine-host path))
+
+(defun orgmine/api-plist-to-alist (plist)
+  ;; (:k1 v1 :k2 v2 ...) -> (("k1" . v1) ("k2" . v2) ...)
+  (let (alist)
+    (while plist
+      (let ((key (elmine/ensure-string (car plist))) ; XXX
+            (value (car (cdr plist))))
+        (push (cons key value) alist))
+      (setq plist (cdr (cdr plist))))
+    alist))
+
+(defun orgmine/api-raw (method path data params &optional content-type)
+  "Perform a raw HTTP request with given METHOD, a relative PATH and a
+plist of PARAMS for the query.
+This is a request.el version of `elmine/api-raw'."
+  (if (listp data)
+      (setq data (orgmine/api-encode data)))
+  (let* ((orgmine-host (cond ((boundp 'orgmine-host) orgmine-host)
+                             ((boundp 'redmine-host) redmine-host)
+                             (t elmine/host)))
+         (orgmine-api-key (cond ((boundp 'orgmine-api-key) orgmine-api-key)
+                                ((boundp 'redmine-api-key) redmine-api-key)
+                                (t elmine/api-key)))
+         (url (orgmine/api-build-url path))
+         (headers `(("Content-Type" . ,(or content-type "application/json"))
+                    ("X-Redmine-API-Key" . ,orgmine-api-key)))
+         (params (orgmine/api-plist-to-alist params))
+         (response (request url :type method :params params :headers headers
+                            :data data :parser 'orgmine/api-json-read :sync t))
+         (err (request-response-error-thrown response))
+         (status-code (request-response-status-code response)) ; eg, 200
+         (status-text (request-response-header response "status")) ;eg, "200 OK"
+         (body (request-response-data response)))
+    (cond ((eq status-code 404)
+           (signal 'no-such-resource (list status-text url))) ;should be error?
+          (err (signal (car err) (cdr err))))
+    response))
+
+(defun orgmine/api-get (element path &rest params)
+  "Perform an HTTP GET request and return a PLIST with the request information."
+  (let* ((params (if (listp (car params)) (car params) params))
+         (response (orgmine/api-raw "GET" path nil params))
+         (object (request-response-data response)))
+    (if element
+        (plist-get object element)
+      object)))
+
+(defalias 'elmine/api-get 'orgmine/api-get)
+
+(defun orgmine/api-post (element object path &rest params)
+  "Perform an http POST request."
+  (let* ((params (if (listp (car params)) (car params) params))
+         (data (list element object))
+         (response (orgmine/api-raw "POST" path data params))
+         (object (request-response-data response)))
+    object))
+
+(defalias 'elmine/api-post 'orgmine/api-post)
+
+(defun orgmine/api-put (element object path &rest params)
+  "Perform an http PUT request."
+  (let* ((params (if (listp (car params)) (car params) params))
+         (data (list element object))
+         (response (orgmine/api-raw "PUT" path data params))
+         (object (request-response-data response)))
+    object))
+
+(defalias 'elmine/api-put 'orgmine/api-put)
+
+(defun orgmine/api-delete (path &rest params)
+  "Perform an http DELETE request."
+  (let* ((params (if (listp (car params)) (car params) params))
+         (response (orgmine/api-raw "DELETE" path nil params))
+         (object (request-response-data response)))
+    object))
+
+(defalias 'elmine/api-delete 'orgmine/api-delete)
+
+
 ;; ;; workaround for decode the returned string as utf-8
 ;; (defadvice json-read-string (around json-read-string-decode activate)
 ;;   "Decode string processed in `json-read-string' as utf-8."
@@ -216,52 +330,6 @@ Each element has the form (NAME CONFIGURATION)."
       "")))
 
 (defalias 'json-read-string 'orgmine/json-read-string)
-
-;; redefine the function for workaround
-(defun orgmine/api-raw (method path data params)
-  "Perform a raw HTTP request with given METHOD, a relative PATH and a
-plist of PARAMS for the query."
-  (let* ((redmine-host (if (boundp 'redmine-host)
-                           redmine-host
-                         elmine/host))
-         (redmine-api-key (if (boundp 'redmine-api-key)
-                              redmine-api-key
-                            elmine/api-key))
-         (url (elmine/api-build-url path params))
-         (url-request-method method)
-         (url-request-extra-headers
-          `(("Content-Type" . "application/json")
-            ("X-Redmine-API-Key" . ,redmine-api-key)))
-         (url-request-data data)
-         header-end status header body)
-    (save-excursion
-      (switch-to-buffer (url-retrieve-synchronously url))
-      (beginning-of-buffer)
-      (setq header-end (save-excursion
-                         (if (re-search-forward "^$" nil t)
-                             (progn
-                               (forward-char)
-                               (point))
-                           (point-max))))
-      (when (re-search-forward "^HTTP/\\(1\\.0\\|1\\.1\\) \\([0-9]+\\) \\([A-Za-z ]+\\)$" nil t)
-        (setq status (plist-put status :code (string-to-number (match-string 2))))
-        (setq status (plist-put status :text (match-string 3))))
-      (while (re-search-forward "^\\([^:]+\\): \\(.*\\)" header-end t)
-        (setq header (cons (match-string 1) (cons (match-string 2) header))))
-      (unless (eq header-end (point-max))
-;; kame<<<
-;;         (setq body (url-unhex-string
-;;                     (buffer-substring header-end (point-max)))))
-;; =======
-	;; the body part is encoded in utf-8.
-        (setq body (buffer-substring header-end (point-max))))
-;; >>>kame
-      (kill-buffer))
-    `(:status ,status
-      :header ,header
-      :body ,body)))
-
-(defalias 'elmine/api-raw 'orgmine/api-raw)
 
 ;;; XXX
 ;; http://www.redmine.org/projects/redmine/wiki/Rest_IssueJournals
@@ -322,62 +390,20 @@ plist of PARAMS for the query."
 
 (defalias 'elmine/delete-relation 'orgmine/delete-relation)
 
-(defun orgmine/api-raw2 (method path data params)
-  "Perform a raw HTTP request with given METHOD, a relative PATH and a
-plist of PARAMS for the query."
-  (let* ((redmine-host (if (boundp 'redmine-host)
-                           redmine-host
-                         elmine/host))
-         (redmine-api-key (if (boundp 'redmine-api-key)
-                              redmine-api-key
-                            elmine/api-key))
-         (url (elmine/api-build-url path params))
-         (url-request-method method)
-         (url-request-extra-headers
-;;           `(("Content-Type" . "application/json")
-          `(("Content-Type" . "application/octet-stream")
-            ("X-Redmine-API-Key" . ,redmine-api-key)))
-         (url-request-data data)
-         header-end status header body)
-    (save-excursion
-      (switch-to-buffer (url-retrieve-synchronously url))
-      (beginning-of-buffer)
-      (setq header-end (save-excursion
-                         (if (re-search-forward "^$" nil t)
-                             (progn
-                               (forward-char)
-                               (point))
-                           (point-max))))
-      (when (re-search-forward "^HTTP/\\(1\\.0\\|1\\.1\\) \\([0-9]+\\) \\([A-Za-z ]+\\)$" nil t)
-        (setq status (plist-put status :code (string-to-number (match-string 2))))
-        (setq status (plist-put status :text (match-string 3))))
-      (while (re-search-forward "^\\([^:]+\\): \\(.*\\)" header-end t)
-        (setq header (cons (match-string 1) (cons (match-string 2) header))))
-      (unless (eq header-end (point-max))
-        (setq body (url-unhex-string
-                    (buffer-substring header-end (point-max)))))
-      (kill-buffer))
-    `(:status ,status
-      :header ,header
-      :body ,body)))
-
-(defalias 'elmine/api-raw2 'orgmine/api-raw2)
-
-(defun orgmine/api-post2 (data path &rest params)
+(defun orgmine/api-post-octet-stream (data path &rest params)
   "Does an http POST request and returns response status as symbol."
   (let* ((params (if (listp (car params)) (car params) params))
-         (response (elmine/api-raw2 "POST" path data params))
-         (object (elmine/api-decode (plist-get response :body))))
+         (response (elmine/api-raw "POST" path data params
+                                   "application/octet-stream"))
+         (object (request-response-data response)))
     object))
-
-(defalias 'elmine/api-post2 'orgmine/api-post2)
 
 (defun orgmine/upload-file (file)
   "upload a specific file to Redmine for the attachment."
   (let ((data (with-temp-buffer
 		(insert-file-contents-literally file)
 		(buffer-string))))
-    (elmine/api-post2 data "/uploads.json")))
+    (orgmine/api-post-octet-stream data "/uploads.json")))
 
 (defalias 'elmine/upload-file 'orgmine/upload-file)
 
@@ -485,9 +511,7 @@ whose host is BASE-URL."
 	(set (make-local-variable 'orgmine-server) server))
     (mapc (lambda (elem)
 	    (let* ((key (car elem))
-		   (fmt (if (memq key '(host api-key))
-			    "elmine/%s" "orgmine-%s"))
-		   (symbol (intern (format fmt key)))
+		   (symbol (intern (format "orgmine-%s" key)))
 		   (value (cdr elem)))
 	      (if (memq key orgmine-valid-variables)
 		  (progn
@@ -2231,6 +2255,7 @@ NB: the journal is not submitted to the server."
     (if arg
 	(orgmine-find-journals end nil t)
       (orgmine-find-journals end t t)
+      (setq beg (point))
       (if (orgmine-find-new-journal end)
 	  (progn
 	    (if (re-search-forward org-block-regexp end t)
@@ -2241,6 +2266,7 @@ NB: the journal is not submitted to the server."
 	      (forward-line -1)
 	      (orgmine-insert-note "\n" t))
 	    (message "new journal entry already exist."))
+        (goto-char beg)
 	(let ((orgmine-journal-title-format "New Journal"))
 	  (orgmine-insert-journal (point) end journal id 0 t))
 	(org-toggle-tag orgmine-tag-update-me 'on)
