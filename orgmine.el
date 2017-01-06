@@ -1,6 +1,6 @@
 ;;; orgmine.el --- minor mode for org-mode with redmine integration
 
-;; Copyright (C) 2015-2016 Tokuya Kameshima
+;; Copyright (C) 2015-2017 Tokuya Kameshima
 
 ;; Author: Tokuya Kameshima <kametoku at gmail dot com>
 ;; Keywords: outlines, hypermedia, calendar, wp
@@ -1157,15 +1157,22 @@ Only the properties given by PROPERTY-LIST are retrieved."
 	 (id (nth 1 plist)))
     id))
 
+(defun orgmine-todo-keyword (name)
+  "Convert Redmine a status name to orgmode todo keyword.
+Space characters and brackets are removed from the status name."
+  (replace-regexp-in-string "(.*)" "" 
+                            (replace-regexp-in-string " " "" name)))
+
 (defvar orgmine-statuses)
 
-(defun orgmine-issue-status-id (name)
-  ;; status name -> status id
+(defun orgmine-issue-status-id (todo-keyword)
+  ;; orgmode todo-keyword -> redmine status id
   ;; TODO: cache statues
   (or orgmine-statuses (setq orgmine-statuses (elmine/get-issue-statuses)))
   (catch 'found
     (mapc (lambda (status)
-	    (if (equal (plist-get status :name) name)
+	    (if (equal (orgmine-todo-keyword (plist-get status :name))
+                       todo-keyword)
 		(throw 'found (plist-get status :id))))
 	  orgmine-statuses)))
 
@@ -1214,13 +1221,13 @@ is returned."
       (nth 0 org-todo-keywords-1)
       1))
 
-(defun orgmine-todo (keyword)
-  "Set the TODO state to KEYWORD."
+(defun orgmine-todo (name)
+  "Set the TODO state to NAME."
   (let ((org-after-todo-state-change-hook
          org-after-todo-state-change-hook))
     (remove-hook 'org-after-todo-state-change-hook
                  'orgmine-after-todo-state-change)
-    (org-todo keyword)))
+    (org-todo (orgmine-todo-keyword name))))
 
 (defun orgmine-collect-update-plist (issue &optional subject-prop)
   "collect updating entries and return them as plist"
@@ -3153,14 +3160,14 @@ Then entry could be an issue, version, tracker or project."
   (let* ((issue-statuses (elmine/get-issue-statuses))
 	 open-statuses closed-statuses)
     (mapc (lambda (status)
-	    (let ((name (orgmine-name status nil t)))
+	    (let ((name (orgmine-name status nil nil)))
 	      (if (plist-get status :is_closed)
 		  (add-to-list 'closed-statuses name)
 		(add-to-list 'open-statuses name))))
 	  (nreverse issue-statuses))
-    (insert "#+SEQ_TODO: " (mapconcat 'identity open-statuses " "))
+    (insert "#+SEQ_TODO: " (mapconcat 'orgmine-todo-keyword open-statuses " "))
     (if closed-statuses
-	(insert " | " (mapconcat 'identity closed-statuses " ")))
+	(insert " | " (mapconcat 'orgmine-todo-keyword closed-statuses " ")))
     (insert "\n")))
 
 (defun orgmine-insert-assigned-to-property-template ()
@@ -3175,10 +3182,10 @@ Then entry could be an issue, version, tracker or project."
 (defun orgmine-insert-status-property-template ()
   (let* ((statuses (elmine/get-issue-statuses))
 	 (list (mapcar (lambda (status)
-			 (orgmine-idname status nil t))
+			 (orgmine-idname status nil nil))
 		       statuses)))
     (insert "#+PROPERTY: om_status_ALL "
-	    (mapconcat 'identity list " ")
+	    (mapconcat 'orgmine-todo-keyword list " ") ; XXX
 	    " opne locked closed"	; for fixed_version
 	    "\n")))
 
