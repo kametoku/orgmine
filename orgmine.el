@@ -233,7 +233,8 @@ arrays are going to be lists."
   "Perform a raw HTTP request with given METHOD, a relative PATH and a
 plist of PARAMS for the query.
 This is a request.el version of `elmine/api-raw'."
-  (if (listp data)
+  (if (and (not (null data))
+           (listp data))
       (setq data (orgmine/api-encode data)))
   (let* ((orgmine-host (cond ((boundp 'orgmine-host) orgmine-host)
                              ((boundp 'redmine-host) redmine-host)
