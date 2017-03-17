@@ -214,7 +214,7 @@ arrays are going to be lists."
   "Return a JSON representation from the given object OBJECT."
   (let ((json-object-type 'plist)
         (json-array-type 'list))
-    (json-encode object)))
+    (encode-coding-string (json-encode object) 'utf-8)))
 
 (defun orgmine/api-build-url (path)
   (concat orgmine-host path))
