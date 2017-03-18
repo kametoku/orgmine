@@ -15,7 +15,8 @@ edit the entries locally, and submit the changes to Redmine.
 available from MELPA.  Install these packages as well.
 - [[https://github.com/leoc/elmine][elmine]] --- Redmine API access via elisp.
 - [[https://github.com/magnars/s.el][s]] --- The long lost Emacs string manipulation library.
-- [[http://jblevins.org/projects/markdown-mode/][markdown-mode]] --- Emacs Major mode for Markdown-formatted text files
+- [[http://jblevins.org/projects/markdown-mode/][markdown-mode]] --- Emacs Major mode for Markdown-formatted text files.
+- [[https://github.com/tkf/emacs-request][request]] --- Compatible layer for URL request in Emacs.
 
 =orgmine= was developed and tested on the following environment:
 - GNU Emacs 24.3.1
