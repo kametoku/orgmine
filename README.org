@@ -134,8 +134,10 @@ The following is an example of =orgmine-tags= setting.
 #+begin_src emacs-lisp
   (setq orgmine-tags '((update-me . "UPDATE_ME")
                        (create-me . "CREATE_ME")
+                       (refile-me . "REFILE_ME")
                        (project . "project")
                        (tracker . "tracker")
+                       (versions . "versions")
                        (version . "version")
                        (issue . "issue")
                        (description . "description")
