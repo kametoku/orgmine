@@ -447,7 +447,8 @@ whose host is BASE-URL."
             (let ((host (cdr (assoc 'host (cdr elem)))))
               (if (string= host base-url)
                   (throw 'found elem))))
-          orgmine-servers)))
+          orgmine-servers)
+    nil))
 
 (defun orgmine-parse-issue-url (url)
   "Parse URL and return a cons (SERVER . ISSUE-ID)."
@@ -1028,7 +1029,8 @@ Only the properties provided in PROPERTY-LIST are updated."
 		   (org-set-property name (elmine/ensure-string value))))))
 	property-list))
 
-(defvar orgmine-id-properties '(project assigned_to tracker fixed_version)
+(defvar orgmine-id-properties '(project assigned_to tracker fixed_version
+                                        author category)
   "redmine property names whose value is plist of (:id ID :name NAME).")
 
 (defun orgmine-id-property-p (property)
@@ -1254,9 +1256,8 @@ is returned."
 	     (orgmine-get-properties nil '(tracker fixed_version project) t))
 	    (plist
 	     (orgmine-get-properties
-	      nil '(id start_date due_date done_ratio assigned_to
-;; 		       estimated_hours custom_fields) nil)))
-		       estimated_hours custom_fields relations) nil)))
+	      nil '(id start_date due_date done_ratio assigned_to author
+                       category estimated_hours custom_fields relations) nil)))
        (setq plist (plist-merge plist plist-inherit))
        (if title
 	   (setq plist			; `subject-prop': :subject or :name
@@ -1925,7 +1926,8 @@ return the issue number of the current entry."
 	  (t ;; issue entry
 	   (let ((names
 		  (list "om_tracker" "om_parent" "om_done_ratio"
-			"om_assigned_to" "om_fixed_version"
+			"om_assigned_to" "om_author" "om_category"
+                        "om_fixed_version"
 			"om_relation_relates"
 			"om_relation_duplicates" "om_relation_duplicated"
 			"om_relation_blocks" "om_relation_blocked"
@@ -1967,7 +1969,8 @@ the entry is not updated."
    '(id tracker created_on updated_on closed_on
 	parent status fixed_version ;; author
 	start_date due_date done_ratio
-	estimated_hours assigned_to project custom_fields relations)
+	estimated_hours assigned_to author category
+        project custom_fields relations)
    (lambda (plist beg end)
      (let ((description (plist-get plist :description))
 	   (journals (plist-get plist :journals))
@@ -2478,6 +2481,17 @@ set PROPERTY to VALUE."
   (interactive (list nil current-prefix-arg))
   (orgmine-set-entry-property (orgmine-property-name 'assigned_to) value arg))
 
+;; XXX: "Author" would be a read only attribute.
+;; (defun orgmine-set-author (value &optional arg)
+;;   "In the current issue, set :author property to VALUE."
+;;   (interactive (list nil current-prefix-arg))
+;;   (orgmine-set-entry-property (orgmine-property-name 'author) value arg))
+
+(defun orgmine-set-category (value &optional arg)
+  "In the current issue, set :category property to VALUE."
+  (interactive (list nil current-prefix-arg))
+  (orgmine-set-entry-property (orgmine-property-name 'category) value arg))
+
 (defun orgmine-set-done-ratio (value &optional arg)
   "In the current issue, set :done_ratio property to VALUE."
   (interactive (list nil current-prefix-arg))
@@ -2833,6 +2847,26 @@ found in the region from BEG to END."
        "om_me property not found. define it by \"#+PROPERTY om_me\" line"))
     (orgmine-show-assigned-to me todo-only)))
 
+(defun orgmine-show-assigned-to (who todo-only)
+  "Show entries author of WHO."
+  (interactive (list (org-icompleting-read
+		      "Author: "
+		      (mapcar #'list (org-property-values "author")))
+		     current-prefix-arg))
+  (let ((match (format "%s+om_author=\"%s\"" orgmine-tag-issue who))
+	(what (format "issues whose author is %s..." who)))
+    (orgmine-match-sparse-tree todo-only match what)))
+
+(defun orgmine-show-category (category)
+  "Show entries of CATEGORY."
+  (interactive (list (org-icompleting-read
+		      "Category: "
+		      (mapcar #'list (org-property-values "om_category")))
+		     current-prefix-arg))
+  (let ((match (format "%s+om_category=\"%s\"" orgmine-tag-issue category))
+	(what (format "issues category of %s..." category)))
+    (orgmine-match-sparse-tree todo-only match what)))
+
 (defun orgmine-show-notes (arg)
   "Show notes."
   (interactive "P")
@@ -3177,6 +3211,25 @@ Then entry could be an issue, version, tracker or project."
 			 (orgmine-idname user orgmine-user-name-format t))
 		       users)))
     (insert "#+PROPERTY: om_assigned_to_ALL "
+	    (mapconcat 'identity list " ")
+	    "\n")))
+
+(defun orgmine-insert-author-property-template ()
+  (let* ((users (elmine/get-users))
+	 (list (mapcar (lambda (user)
+			 (orgmine-idname user orgmine-user-name-format t))
+		       users)))
+    (insert "#+PROPERTY: om_author_ALL "
+	    (mapconcat 'identity list " ")
+	    "\n")))
+
+(defun orgmine-insert-category-property-template ()
+  (let* ((users (elmine/get-categories)) ; TODO
+	 (list (mapcar (lambda (category)
+                         ;; XXX
+			 (orgmine-idname category orgmine-user-name-format t))
+		       category)))
+    (insert "#+PROPERTY: om_category_ALL "
 	    (mapconcat 'identity list " ")
 	    "\n")))
 
