@@ -912,13 +912,14 @@ or move to current issue headline."
 (defun orgmine-custom-field-property-name (plist)
   ;; (:value "3" :name "Owner" :id 1) -> "om_cf_1_Owner"
   (format "om_cf_%s_%s"
-	  (plist-get plist :id) (plist-get plist :name)))
+	  (plist-get plist :id) (org-link-escape (plist-get plist :name)
+                                                 '(? ?% ?:))))
 
 (defun orgmine-custom-field-plist (property-name)
   ;; "om_cf_1_Owner" -> (:name "Owner" :id 1)
   (save-match-data
     (if (string-match "^om_cf_\\([0-9]+\\)_\\(.*\\)" property-name)
-	(list :name (match-string 2 property-name)
+	(list :name (org-link-unescape (match-string 2 property-name))
 	      :id (match-string 1 property-name)))))
 
 (defun orgmine-set-properties-custom-fields (custom-fields)
