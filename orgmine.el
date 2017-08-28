@@ -911,9 +911,10 @@ or move to current issue headline."
 
 (defun orgmine-custom-field-property-name (plist)
   ;; (:value "3" :name "Owner" :id 1) -> "om_cf_1_Owner"
-  (format "om_cf_%s_%s"
-	  (plist-get plist :id) (org-link-escape (plist-get plist :name)
-                                                 '(? ?% ?:))))
+  (let ((org-url-hexify-p nil))
+    (format "om_cf_%s_%s"
+            (plist-get plist :id) (org-link-escape (plist-get plist :name)
+                                                   '(? ?% ?:)))))
 
 (defun orgmine-custom-field-plist (property-name)
   ;; "om_cf_1_Owner" -> (:name "Owner" :id 1)
