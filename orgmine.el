@@ -394,8 +394,8 @@ This is a request.el version of `elmine/api-raw'."
 (defun orgmine/api-post-octet-stream (data path &rest params)
   "Does an http POST request and returns response status as symbol."
   (let* ((params (if (listp (car params)) (car params) params))
-         (response (elmine/api-raw "POST" path data params
-                                   "application/octet-stream"))
+         (response (orgmine/api-raw "POST" path data params
+                                    "application/octet-stream"))
          (object (request-response-data response)))
     object))
 
