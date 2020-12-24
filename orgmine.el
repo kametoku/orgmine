@@ -507,7 +507,7 @@ whose host is BASE-URL."
 
 (defun orgmine-setup ()
   "Setup buffer local variables from ORGMINE-SERVERS per om_server property."
-  (let* ((server (cdr (assoc-string "om_server" org-file-properties t)))
+  (let* ((server (cdr (assoc-string "om_server" org-keyword-properties t)))
 	 (config (cdr (assoc-string server orgmine-servers t))))
     (if config
 	(set (make-local-variable 'orgmine-server) server))
@@ -913,14 +913,14 @@ or move to current issue headline."
   ;; (:value "3" :name "Owner" :id 1) -> "om_cf_1_Owner"
   (let ((org-url-hexify-p nil))
     (format "om_cf_%s_%s"
-            (plist-get plist :id) (org-link-escape (plist-get plist :name)
+            (plist-get plist :id) (org-link-encode (plist-get plist :name)
                                                    '(? ?% ?:)))))
 
 (defun orgmine-custom-field-plist (property-name)
   ;; "om_cf_1_Owner" -> (:name "Owner" :id 1)
   (save-match-data
     (if (string-match "^om_cf_\\([0-9]+\\)_\\(.*\\)" property-name)
-	(list :name (org-link-unescape (match-string 2 property-name))
+	(list :name (org-link-decode (match-string 2 property-name))
 	      :id (match-string 1 property-name)))))
 
 (defun orgmine-set-properties-custom-fields (custom-fields)
@@ -1221,7 +1221,7 @@ The default TODO keyword can be specified by \"om_default_todo\" property,
 such as \"#+PROPERTY: om_default_todo NEW\".
 If the property is not found, the first TODO keyword of `org-todo-keywords-1'
 is returned."
-  (or (cdr (assoc-string "om_default_todo" org-file-properties))
+  (or (cdr (assoc-string "om_default_todo" org-keyword-properties))
       orgmine-default-todo-keyword
       (nth 0 org-todo-keywords-1)
       1))
@@ -2053,7 +2053,9 @@ The variables to be copies are whose names start with
      id-list)))
 
 (defun orgmine-archived-ids (tag id-prop)
-  (let ((afile (org-extract-archive-file)))
+  (let ((afile (car (org-archive--compute-location
+		          (or (org-entry-get nil "ARCHIVE" 'inherit) org-archive-location)))))
+  ;; (let ((afile (org-extract-archive-file)))
     (if (file-exists-p afile)
 	(let* ((curbuf (current-buffer))
 	       (visiting (find-buffer-visiting afile))
