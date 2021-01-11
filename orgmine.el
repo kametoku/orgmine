@@ -476,7 +476,7 @@ whose host is BASE-URL."
       (orgmine-insert-issue issue-id))
     (hide-subtree)
     (show-branches)
-    (org-align-all-tags)
+    (org-align-tags t)
     (set-buffer-modified-p nil)
     (run-hooks 'orgmine-issue-buffer-hook)
     (message "Editing issue #%s on %s" issue-id server)))
@@ -1278,7 +1278,7 @@ is returned."
        (if effort
 	   (setq plist
 		 (plist-put plist :estimated_hours
-			    (/ (org-duration-string-to-minutes effort) 60))))
+			    (/ (org-duration-to-minutes effort) 60))))
        (if description
 	   (setq plist
 		 (plist-put plist :description (orgmine-note description))))
@@ -1392,7 +1392,7 @@ Return plist whose key is KEY and its value is equal to VALUE."
     (open-line 1)
     (insert orgmine-note-block-begin)	; "#+begin_src gfm"
     (org-indent-line)
-    (let ((indent (org-get-indentation))
+    (let ((indent (current-indentation))
 	  pos)
       (insert "\n")
       (setq pos (point))
@@ -2834,7 +2834,7 @@ found in the region from BEG to END."
 
 (defun orgmine-show-assigned-to (who todo-only)
   "Show entries assigned to WHO."
-  (interactive (list (org-icompleting-read
+  (interactive (list (completing-read
 		      "Assigned To: "
 		      (mapcar #'list (org-property-values "om_assigned_to")))
 		     current-prefix-arg))
@@ -2853,7 +2853,7 @@ found in the region from BEG to END."
 
 (defun orgmine-show-assigned-to (who todo-only)
   "Show entries author of WHO."
-  (interactive (list (org-icompleting-read
+  (interactive (list (completing-read
 		      "Author: "
 		      (mapcar #'list (org-property-values "author")))
 		     current-prefix-arg))
@@ -2863,7 +2863,7 @@ found in the region from BEG to END."
 
 (defun orgmine-show-category (category)
   "Show entries of CATEGORY."
-  (interactive (list (org-icompleting-read
+  (interactive (list (completing-read
 		      "Category: "
 		      (mapcar #'list (org-property-values "om_category")))
 		     current-prefix-arg))
@@ -3013,11 +3013,11 @@ If UPDATE-ONLY is nil, insert issue that does not exist in the buffer."
 
 (defun orgmine-sync-region (beg end &optional force update-only cache)
   (interactive "r\nP")
-  (if (and (org-called-interactively-p 'interactive)
+  (if (and (called-interactively-p 'interactive)
 	   (not (org-region-active-p)))
       (error "region not active"))
   (let ((orgmine-ignore-ids orgmine-ignore-ids))
-    (if (org-called-interactively-p 'interactive)
+    (if (called-interactively-p 'interactive)
 	(setq orgmine-ignore-ids (orgmine-archived-issues)))
     (setq end (copy-marker end))
     (org-with-wide-buffer			; XXX
@@ -3361,7 +3361,7 @@ If TODO-KEYWORD is not null, set TODO Keyword to TODO-KEYWORD."
 
 (defun orgmine-skeletonize-region (beg end arg)
   (interactive "r\nP")
-  (if (and (org-called-interactively-p 'interactive)
+  (if (and (called-interactively-p 'interactive)
 	   (not (org-region-active-p)))
       (error "region not active"))
   (setq end (copy-marker end))
@@ -3401,7 +3401,7 @@ If TODO-KEYWORD is not null, set TODO Keyword to TODO-KEYWORD."
     (orgmine-toggle-tag orgmine-tag-update-me 'on)
     (message "run M-x orgmine-submit to send the changes to Redmine server.")))
 ;; (defun orgmine-after-todo-state-change ()
-;;   (if (and (org-called-interactively-p 'interactive) ; XXX
+;;   (if (and (called-interactively-p 'interactive) ; XXX
 ;; 	   (member orgmine-tag-issue (org-get-tags)))
 ;;       (org-toggle-tag orgmine-tag-update-me 'on)))
 
