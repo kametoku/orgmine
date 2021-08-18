@@ -3200,7 +3200,7 @@ Then entry could be an issue, version, tracker or project."
 	 open-statuses closed-statuses)
     (mapc (lambda (status)
 	    (let ((name (orgmine-name status nil nil)))
-	      (if (plist-get status :is_closed)
+	      (if (eq t (plist-get status :is_closed))
 		  (add-to-list 'closed-statuses name)
 		(add-to-list 'open-statuses name))))
 	  (nreverse issue-statuses))
