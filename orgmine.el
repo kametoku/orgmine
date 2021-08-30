@@ -207,7 +207,8 @@ arrays are going to be lists."
   (unless (or (null json-string)
               (string= json-string ""))
     (let ((json-object-type 'plist)
-          (json-array-type 'list))
+          (json-array-type 'list)
+          (json-false nil))
       (json-read-from-string json-string))))
 
 (defun orgmine/api-encode (object)
