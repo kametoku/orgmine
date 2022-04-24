@@ -37,7 +37,7 @@ Note that "om_project" property is a mandatory property to use orgmine.
 #+begin_src emacs-lisp
   (require 'orgmine)
   (add-hook 'org-mode-hook
-            (lambda () (if (assoc "om_project" org-file-properties)
+            (lambda () (if (assoc "om_project" org-keyword-properties)
                            (orgmine-mode))))
 #+end_src
 
