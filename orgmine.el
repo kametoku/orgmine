@@ -3245,7 +3245,7 @@ Then entry could be an issue, version, tracker or project."
 		       statuses)))
     (insert "#+PROPERTY: om_status_ALL "
 	    (mapconcat 'orgmine-todo-keyword list " ") ; XXX
-	    " opne locked closed"	; for fixed_version
+	    " open locked closed"	; for fixed_version
 	    "\n")))
 
 (defun orgmine-insert-tracker-property-template (project)
