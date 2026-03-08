@@ -1131,7 +1131,7 @@ from the headline property drawer."
 		      (save-restriction
 ;; 			(widen)
 ;; 			(org-show-hidden-entry) ;XXX
-			(org-entry-get pom name inherit))
+			(org-entry-get pom name inherit t))
 ;; 		    (or properties
 ;; 			(setq properties (orgmine-entry-properties pom 'all)))
 		    (cdr (assoc-string name properties t)))))
@@ -1166,7 +1166,7 @@ Only the properties given by PROPERTY-LIST are retrieved."
 (defun orgmine-todo-keyword (name)
   "Convert Redmine a status name to orgmode todo keyword.
 Space characters and brackets are removed from the status name."
-  (replace-regexp-in-string "(.*)" "" 
+  (replace-regexp-in-string "(.*)" ""
                             (replace-regexp-in-string " " "" name)))
 
 (defvar orgmine-statuses)
@@ -1252,9 +1252,9 @@ is returned."
      (goto-char beg)
      (let* ((title (org-element-property :title issue))
 	    (todo-keyword (org-element-property :todo-keyword issue))
-	    (scheduled (org-entry-get nil "SCHEDULED"))
-	    (deadline (org-entry-get nil "DEADLINE"))
-	    (effort (org-entry-get nil org-effort-property)) ; "Effort"
+	    (scheduled (org-entry-get nil "SCHEDULED" nil t))
+	    (deadline (org-entry-get nil "DEADLINE" nil t))
+	    (effort (org-entry-get nil org-effort-property t)) ; "Effort"
 	    (plist-inherit
 	     (orgmine-get-properties nil '(tracker fixed_version project) t))
 	    (plist
@@ -2018,12 +2018,12 @@ The variables to be copies are whose names start with
 \"orgmine-\", \"org-\", or \"elmine/\"."
   (with-current-buffer buf-to
     (mapc (lambda (var)
-	    (let ((symbol (car var))
-		  (value (cdr var)))
-	      (if (string-match "^\\(orgmine-\\|org-\\|elmine/\\)"
-				(symbol-name symbol))
-		  (set (make-local-variable symbol) value))))
-	  (buffer-local-variables buf-from))))
+            (let ((symbol (car var))
+                  (value (cdr var)))
+              (if (and (string-match "^\\(orgmine-\\|org-\\|elmine/\\)" (symbol-name symbol))
+                       (not (string-match "^\\(org-element-\\|org-outline-\\)" (symbol-name symbol))))
+                  (set (make-local-variable symbol) value))))
+          (buffer-local-variables buf-from))))
 
 (defvar orgmine-id-list-alist nil)
 
@@ -2055,7 +2055,7 @@ The variables to be copies are whose names start with
 
 (defun orgmine-archived-ids (tag id-prop)
   (let ((afile (car (org-archive--compute-location
-		          (or (org-entry-get nil "ARCHIVE" 'inherit) org-archive-location)))))
+		          (or (org-entry-get nil "ARCHIVE" 'inherit t) org-archive-location)))))
   ;; (let ((afile (org-extract-archive-file)))
     (if (file-exists-p afile)
 	(let* ((curbuf (current-buffer))
@@ -2846,7 +2846,7 @@ found in the region from BEG to END."
 (defun orgmine-show-assigned-to-me (todo-only)
   "Show entries of Redmine issue/version to update."
   (interactive "P")
-  (let ((me (org-entry-get (point-min) "om_me" t)))
+  (let ((me (org-entry-get (point-min) "om_me" t t)))
     (unless me
       (error
        "om_me property not found. define it by \"#+PROPERTY om_me\" line"))
