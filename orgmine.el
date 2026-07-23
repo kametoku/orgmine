@@ -2954,7 +2954,7 @@ new entry will be inserted into the current position."
 	      (if (not project)
 		  (error "no project property (project_id) exists")
 		(message "retrieving issues with filter: %s" filters)
-		(apply 'elmine/get-project-issues project filters))))
+		(apply 'elmine/get-project-issues project (append filters '(:limit t))))))
 	(prog1 redmine-issues
 	  (if (not redmine-issues)
 	      (message "no issue exists for %s" filters)
