@@ -1,1 +1,4 @@
 README.html
+*-pkg.el
+*-autoloads.el
+.test-elpa
