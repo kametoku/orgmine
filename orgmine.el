@@ -133,19 +133,19 @@
   "Alist of tags which are used in orgmine mode."
   :group 'orgmine)
 
-(defvar orgmine-tag-update-me)
-(defvar orgmine-tag-create-me)
-(defvar orgmine-tag-refile-me)
-(defvar orgmine-tag-project)
-(defvar orgmine-tag-tracker)
-(defvar orgmine-tag-versions)
-(defvar orgmine-tag-version)
-(defvar orgmine-tag-issue)
-(defvar orgmine-tag-description)
-(defvar orgmine-tag-journals)
-(defvar orgmine-tag-journal)
-(defvar orgmine-tag-attachments)
-(defvar orgmine-tag-wiki)
+(defvar orgmine-tag-update-me (cdr (assq 'update-me orgmine-tags)))
+(defvar orgmine-tag-create-me (cdr (assq 'create-me orgmine-tags)))
+(defvar orgmine-tag-refile-me (cdr (assq 'refile-me orgmine-tags)))
+(defvar orgmine-tag-project (cdr (assq 'project orgmine-tags)))
+(defvar orgmine-tag-tracker (cdr (assq 'tracker orgmine-tags)))
+(defvar orgmine-tag-versions (cdr (assq 'versions orgmine-tags)))
+(defvar orgmine-tag-version (cdr (assq 'version orgmine-tags)))
+(defvar orgmine-tag-issue (cdr (assq 'issue orgmine-tags)))
+(defvar orgmine-tag-description (cdr (assq 'description orgmine-tags)))
+(defvar orgmine-tag-journals (cdr (assq 'journals orgmine-tags)))
+(defvar orgmine-tag-journal (cdr (assq 'journal orgmine-tags)))
+(defvar orgmine-tag-attachments (cdr (assq 'attachments orgmine-tags)))
+(defvar orgmine-tag-wiki (cdr (assq 'wiki orgmine-tags)))
 
 (defcustom orgmine-servers
   '(("redmine"
@@ -599,11 +599,13 @@ whose host is BASE-URL."
 (defun orgmine-insert-demoted-heading (&optional title tags-list)
   "Insert a demoted headling at the beginning of the current line."
   (move-beginning-of-line nil)
-  (if (save-match-data
-	(or (looking-at "^\\*+ ") (eobp)))
-      (open-line 1))
-  (outline-insert-heading)
-  (org-do-demote)
+  (if (org-before-first-heading-p)
+      (insert "* ")
+    (if (save-match-data
+	  (or (looking-at "^\\*+ ") (eobp)))
+	(open-line 1))
+    (outline-insert-heading)
+    (org-do-demote))
   (insert (or title ""))
   (mapc (lambda (tag)
 	  (org-toggle-tag tag 'on))
@@ -1169,7 +1171,7 @@ Space characters and brackets are removed from the status name."
   (replace-regexp-in-string "(.*)" ""
                             (replace-regexp-in-string " " "" name)))
 
-(defvar orgmine-statuses)
+(defvar orgmine-statuses nil)
 
 (defun orgmine-issue-status-id (todo-keyword)
   ;; orgmode todo-keyword -> redmine status id
@@ -2376,7 +2378,8 @@ NB: the attachments is not submitted to the server."
 	     fixed-version))
 ;;     (org-insert-heading arg)
 ;;     (org-toggle-tag orgmine-tag-version 'on)
-    (show-branches)
+    (unless (org-before-first-heading-p)
+      (show-branches))
     (move-beginning-of-line nil)
     (orgmine-insert-demoted-heading "" (list orgmine-tag-version))
     (org-set-property "om_fixed_version" fixed-version)
@@ -2432,7 +2435,10 @@ The following version entries are not inserted:
       (error "Project #%s does not exist on Redmine or some error occurred."
 	     project))
 ;;     (org-insert-heading arg)
-    (outline-insert-heading)
+    (move-beginning-of-line nil)
+    (if (org-before-first-heading-p)
+        (insert "* ")
+      (outline-insert-heading))
     (org-toggle-tag orgmine-tag-project 'on)
     (org-set-property "om_project" project)
     (let ((project (org-element-at-point)))
@@ -2636,7 +2642,7 @@ found in the region from BEG to END."
 
 ;;;
 
-(defvar orgmine-ignore-ids)
+(defvar orgmine-ignore-ids nil)
 
 (defun orgmine-find-issue (redmine-id end)
   (if (numberp redmine-id)
