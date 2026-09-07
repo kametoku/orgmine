@@ -302,6 +302,42 @@ Move the cursor to the issue headline and run M-x orgmine-fetch (C-c m f)
 to fetch the latest contents of the issue from Redmine and update the
 local entry.
 
+*** Time entries and the LOGBOOK
+
+Time-entry synchronization is optional.  Set `orgmine-sync-time-entries`
+to non-nil to make every issue fetch pull Redmine time entries and every
+issue submission push closed local clock lines.  The commands also work
+when that option is nil:
+
+- `C-c m t` (`M-x orgmine-sync-time-entries`) pulls and then pushes.
+- `C-c m l` (`M-x orgmine-push-time-entries`) pushes only.
+- `M-x orgmine-pull-time-entries` pulls only.
+
+All three commands operate on the issue at or above point.  Set the
+`om_activity` property to an activity name or an `ID:Name` value, or set
+`orgmine-time-entry-activity` to an activity name or numeric ID, before
+pushing.  If neither is set, an interactive push prompts from Redmine's
+activity list.  `orgmine-time-entry-default-start` controls the synthesized
+wall-clock start (09:00 by default) for pulled entries; Redmine provides a
+date and duration but no start time.  Entries on the same day are placed
+back-to-back from that start time.
+
+The sync identity is `(spent_on, hours rounded to two decimals, trimmed
+comment)`.  A matching key is never inserted or pushed, so running the sync
+again is safe.  Non-empty comments are kept as the clock-out note directly
+below the clock line.  Only the issue heading's own `:LOGBOOK:` drawer is
+used; child headings are not scanned.  Synchronization never edits or
+deletes an existing clock or Redmine time entry, and deletions are never
+propagated in either direction.
+
+To try it on one issue, move point to that issue and run this sequence:
+
+1. `M-x orgmine-pull-time-entries`.
+2. Add or close a local `CLOCK:` range in the issue's `:LOGBOOK:` drawer.
+3. Set `om_activity` on the issue (for example, `7:Development`).
+4. Run `M-x orgmine-sync-time-entries`.
+
+
 *** Add a new issue
 
 You can run M-x orgmine-add-issue (C-c m i) to add a new issue entry.
@@ -352,6 +388,7 @@ for an issue entry.
 | om_due_date       | issue due date         | converted to DEADLINE property |
 | om_done_ratio     | issue done ratio       |                                |
 | om_project        | issue's project        | id + ":" + project name        |
+| om_activity       | time-entry activity    | name or id used when pushing  |
 
 Note that if both of a property and the corresponding special keyword
 exist for a single issue entry, the special keyword is preferred.

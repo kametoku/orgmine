@@ -51,6 +51,8 @@
 (require 'org)
 (require 'org-archive)
 (require 'timezone)
+(require 'org-clock)
+(require 'time-date)
 
 (defgroup orgmine nil
   "Options concerning orgmie minor mode."
@@ -115,6 +117,26 @@
 (defcustom orgmine-note-block-end "#+end_src"
   ""
   :group 'orgmine)
+
+(defcustom orgmine-sync-time-entries nil
+  "When non-nil, synchronize Redmine time entries with issue LOGBOOKs."
+  :group 'orgmine
+  :type 'boolean)
+
+(defcustom orgmine-time-entry-activity nil
+  "Activity name or ID to use for time entries pushed to Redmine."
+  :group 'orgmine
+  :type '(choice (const :tag "Resolve from om_activity" nil)
+                (string :tag "Activity name")
+                (integer :tag "Activity ID")))
+
+(defcustom orgmine-time-entry-default-start "09:00"
+  "Wall-clock start time for synthesized clocks pulled from Redmine."
+  :group 'orgmine
+  :type 'string)
+
+(defvar orgmine-time-entry-activities nil
+  "Buffer-local cache of Redmine time-entry activities.")
 
 (defcustom orgmine-tags
   '((update-me . "UPDATE_ME")
@@ -363,6 +385,19 @@ This is a request.el version of `elmine/api-raw'."
 
 (defalias 'elmine/get-users 'orgmine/get-users)
 
+(defun orgmine/get-issue-time-entries (issue-id &rest filters)
+  "Get the time entries of ISSUE-ID, all pages unless FILTERS sets :limit.
+elmine requests /issues/ID/time_entries.json, a nested route that current
+Redmine no longer serves (404); the supported form is a filter on
+/time_entries.json."
+  (let ((filters (copy-sequence filters)))
+    (unless (plist-member filters :limit)
+      (setq filters (plist-put filters :limit t)))
+    (apply #'elmine/api-get-all :time_entries "/time_entries.json"
+	   (plist-put filters :issue_id issue-id))))
+
+(defalias 'elmine/get-issue-time-entries 'orgmine/get-issue-time-entries)
+
 (defun orgmine/get-custom-fields (filters)
   "Get a list with custom fields."
   (apply #'elmine/api-get-all :custom_fields "/custom_fields.json" filters))
@@ -550,6 +585,8 @@ whose host is BASE-URL."
   (define-key orgmine-mode-map "\C-cma" 'orgmine-add-attachment)
   (define-key orgmine-mode-map "\C-cmA" 'orgmine-insert-all-versions)
   (define-key orgmine-mode-map "\C-cmc" 'orgmine-submit)
+  (define-key orgmine-mode-map "\C-cmt" 'orgmine-sync-time-entries)
+  (define-key orgmine-mode-map "\C-cml" 'orgmine-push-time-entries)
   (define-key orgmine-mode-map "\C-cmd" 'orgmine-add-description)
   (define-key orgmine-mode-map "\C-cme" 'orgmine-ediff)
   (define-key orgmine-mode-map "\C-cmf" 'orgmine-fetch)
@@ -1205,6 +1242,349 @@ as a cons cell (BEG . END)."
 	    (if (org-at-heading-p) (backward-char 1))
 	    (point)))))
 
+;;;; Time entries and Org clock lines
+
+(defun orgmine--time-entry-number (value)
+  (cond ((numberp value) (float value))
+        ((stringp value) (string-to-number value))
+        (t 0.0)))
+
+(defun orgmine--time-entry-round-hours (hours)
+  (/ (float (round (* 100.0 (orgmine--time-entry-number hours)))) 100.0))
+
+(defun orgmine--time-entry-comment (comment)
+  (if comment
+      (s-trim (format "%s" comment))
+    ""))
+
+(defun orgmine-time-entry-key (entry)
+  "Return the deduplication key for Redmine time-entry plist ENTRY.
+The key consists of spent date, hours rounded to two decimals, and the
+trimmed comment."
+  (list (format "%s" (or (plist-get entry :spent_on) ""))
+        (orgmine--time-entry-round-hours (plist-get entry :hours))
+        (orgmine--time-entry-comment (plist-get entry :comments))))
+
+(defun orgmine--clock-start-date (clock)
+  (let ((start (nth 0 clock)))
+    (cond ((stringp start)
+           (format-time-string "%Y-%m-%d"
+                               (org-time-string-to-time start)))
+          (start (format-time-string "%Y-%m-%d" start)))))
+
+(defun orgmine-clock-line-key (clock)
+  "Return the deduplication key for parsed CLOCK.
+CLOCK is a list of start time, end time, whole minutes, and comment as
+returned by `orgmine-parse-logbook-clocks'."
+  (list (or (orgmine--clock-start-date clock) "")
+        (orgmine--time-entry-round-hours (/ (float (or (nth 2 clock) 0))
+                                            60.0))
+        (orgmine--time-entry-comment (nth 3 clock))))
+
+(defun orgmine-time-entries-missing-locally (entries clocks)
+  "Return Redmine ENTRIES whose keys are absent from local CLOCKS."
+  (let (clock-keys missing)
+    (mapc (lambda (clock)
+            (setq clock-keys (cons (orgmine-clock-line-key clock)
+                                   clock-keys)))
+          clocks)
+    (mapc (lambda (entry)
+            (let ((key (orgmine-time-entry-key entry)))
+              (unless (member key clock-keys)
+                (setq missing (cons entry missing))
+                (setq clock-keys (cons key clock-keys)))))
+          entries)
+    (nreverse missing)))
+
+(defun orgmine-clocks-missing-remotely (clocks entries)
+  "Return local CLOCKS whose keys are absent from remote ENTRIES."
+  (let (entry-keys missing)
+    (mapc (lambda (entry)
+            (setq entry-keys (cons (orgmine-time-entry-key entry)
+                                   entry-keys)))
+          entries)
+    (mapc (lambda (clock)
+            (let ((key (orgmine-clock-line-key clock)))
+              (unless (member key entry-keys)
+                (setq missing (cons clock missing))
+                (setq entry-keys (cons key entry-keys)))))
+          clocks)
+    (nreverse missing)))
+
+(defun orgmine--time-entry-issue-begin (&optional issue)
+  (cond ((integerp issue) issue)
+        ((and issue (org-element-property :begin issue)))
+        (t (org-element-property
+            :begin (orgmine-find-headline-ancestor orgmine-tag-issue)))))
+
+(defun orgmine--time-entry-logbook-region (&optional issue)
+  (let ((beg (orgmine--time-entry-issue-begin issue)))
+    (when beg
+      (save-excursion
+        (goto-char beg)
+        (let ((end (save-excursion
+                     (or (outline-next-heading) (point-max)))))
+          (when (re-search-forward "^[ \t]*:LOGBOOK:[ \t]*$" end t)
+            (let ((contents-beg (line-beginning-position 2)))
+              (when (re-search-forward "^[ \t]*:END:[ \t]*$" end t)
+                (cons contents-beg (line-beginning-position))))))))))
+
+(defun orgmine-parse-logbook-clocks (&optional issue)
+  "Return closed CLOCK records in ISSUE's own LOGBOOK.
+Each record is a list of start time, end time, whole minutes, and the
+trimmed clock-out note.  Child headings and running clocks are ignored."
+  (let ((region (orgmine--time-entry-logbook-region issue)) clocks)
+    (when region
+      (save-excursion
+        (goto-char (car region))
+        (while (re-search-forward
+                "^[ \t]*CLOCK:[ \t]*\\[\\([^]]+\\)\\][ \t]*--[ \t]*\\[\\([^]]+\\)\\][ \t]*=>[ \t]*\\([0-9]+\\):\\([0-9][0-9]\\)"
+                (cdr region) t)
+          (let* ((start-string (match-string-no-properties 1))
+                 (end-string (match-string-no-properties 2))
+                 (hours-string (match-string-no-properties 3))
+                 (minutes-string (match-string-no-properties 4))
+                 (comment
+                  (save-excursion
+                    (goto-char (line-end-position))
+                    (forward-line 1)
+                    (when (looking-at "^[ \t]*-[ \t]+\\(.*\\)$")
+                      (s-trim (match-string-no-properties 1)))))
+                 (clock
+                  (condition-case nil
+                      (list (org-time-string-to-time
+                             (concat "[" start-string "]"))
+                            (org-time-string-to-time
+                             (concat "[" end-string "]"))
+                            (+ (* 60 (string-to-number hours-string))
+                               (string-to-number minutes-string))
+                            comment)
+                    (error nil))))
+            (when clock
+              (setq clocks (cons clock clocks)))))))
+    (nreverse clocks)))
+
+(defun orgmine--time-entry-start-time (date start-time)
+  (cond ((and (listp start-time) (numberp (car start-time))) start-time)
+        ((numberp start-time) start-time)
+        ((and (stringp start-time)
+              (string-match "\\`\\[.*\\]\\'" start-time))
+         (org-time-string-to-time start-time))
+        (t
+         (let* ((date-parts (org-parse-time-string date))
+                (time-text (or start-time orgmine-time-entry-default-start)))
+           (unless (and (stringp time-text)
+                        (string-match
+                         "\\`\\([0-9][0-9]?\\):\\([0-9][0-9]\\)\\'"
+                         time-text))
+             (error "Invalid time-entry start time: %s" time-text))
+           (unless (and date-parts (nth 3 date-parts)
+                        (nth 4 date-parts) (nth 5 date-parts))
+             (error "Invalid time-entry date: %s" date))
+           (encode-time 0
+                        (string-to-number (match-string 2 time-text))
+                        (string-to-number (match-string 1 time-text))
+                        (nth 3 date-parts) (nth 4 date-parts)
+                        (nth 5 date-parts))))))
+
+(defun orgmine--time-entry-minutes (entry)
+  (max 0 (round (* 60.0
+                   (orgmine--time-entry-number (plist-get entry :hours))))))
+
+(defun orgmine-format-time-entry-clock (entry start-time)
+  "Return clock lines for Redmine ENTRY starting at START-TIME.
+The result is a list containing the closed CLOCK line and, when ENTRY has
+a non-empty comment, the following Org clock-out note line."
+  (let* ((start (orgmine--time-entry-start-time
+                 (format "%s" (plist-get entry :spent_on)) start-time))
+         (minutes (orgmine--time-entry-minutes entry))
+         (end (time-add start (seconds-to-time (* 60 minutes))))
+         (comment (orgmine--time-entry-comment (plist-get entry :comments)))
+         (clock-line
+          (format "CLOCK: %s--%s => %2d:%02d"
+                  (format-time-string "[%Y-%m-%d %a %H:%M]" start)
+                  (format-time-string "[%Y-%m-%d %a %H:%M]" end)
+                  (floor minutes 60) (mod minutes 60))))
+    (if (string= comment "")
+        (list clock-line)
+      (list clock-line (concat "- " comment)))))
+
+
+(defun orgmine--time-entry-set-day-end (date end day-ends)
+  (let ((cell (assoc date day-ends)))
+    (if cell
+        (setcdr cell end)
+      (setq day-ends (cons (cons date end) day-ends)))
+    day-ends))
+
+(defun orgmine--insert-time-entry-clock (entry start)
+  (let ((lines (orgmine-format-time-entry-clock entry start)))
+    (org-clock-find-position nil)
+    (let ((indent (current-indentation)))
+      (insert-before-markers-and-inherit "\n")
+      (backward-char 1)
+      (insert-and-inherit (make-string indent ? ) (car lines))
+      (when (cadr lines)
+        (insert-and-inherit "\n" (make-string indent ? ) (cadr lines)))
+      (org-indent-line))))
+
+(defun orgmine--pull-time-entries (issue entries)
+  (let* ((beg (orgmine--time-entry-issue-begin issue))
+         (clocks (orgmine-parse-logbook-clocks issue))
+         (missing (sort (copy-sequence
+                         (orgmine-time-entries-missing-locally entries clocks))
+                        (lambda (left right)
+                          (string< (format "%s" (plist-get left :spent_on))
+                                   (format "%s" (plist-get right :spent_on))))))
+         day-ends)
+    (mapc (lambda (clock)
+            (let ((date (orgmine--clock-start-date clock))
+                  (end (nth 1 clock)))
+              (when (and date end)
+                (let ((cell (assoc date day-ends)))
+                  (if (and cell (time-less-p (cdr cell) end))
+                      (setcdr cell end)
+                    (unless cell
+                      (setq day-ends (cons (cons date end) day-ends))))))))
+          clocks)
+    (mapc (lambda (entry)
+            (let* ((date (format "%s" (plist-get entry :spent_on)))
+                   (default (orgmine--time-entry-start-time date nil))
+                   (previous (cdr (assoc date day-ends)))
+                   (start (if (and previous (time-less-p default previous))
+                              previous default))
+                   (minutes (orgmine--time-entry-minutes entry))
+                   (end (time-add start (seconds-to-time (* 60 minutes)))))
+              (save-excursion
+                (goto-char beg)
+                (let ((org-log-states-order-reversed nil))
+                  (orgmine--insert-time-entry-clock entry start)))
+              (setq day-ends (orgmine--time-entry-set-day-end
+                              date end day-ends))))
+          missing)
+    (length missing)))
+
+(defun orgmine--time-entry-context ()
+  (let* ((issue (orgmine-find-headline-ancestor orgmine-tag-issue))
+         (beg (org-element-property :begin issue))
+         (id (orgmine-get-id beg)))
+    (unless id
+      (user-error "Redmine issue headline without ID (om_id prop)"))
+    (list issue beg id)))
+
+(defun orgmine--time-entry-activity-property (beg)
+  (save-excursion
+    (goto-char beg)
+    (org-entry-get nil "om_activity" t)))
+
+(defun orgmine--time-entry-activity-id (beg promptp)
+  (let* ((value (or orgmine-time-entry-activity
+                    (orgmine--time-entry-activity-property beg)))
+         (value (if (stringp value) (s-trim value) value))
+         (direct-id (cond ((integerp value) value)
+                          ((and (stringp value)
+                                (string-match "\\`[0-9]+\\(?::.*\\)?\\'"
+                                              value))
+                           (string-to-number value)))))
+    (when (and (null direct-id) (null value) (not promptp))
+      (user-error "No time-entry activity is configured"))
+    (or direct-id
+        (progn
+          (unless (local-variable-p 'orgmine-time-entry-activities)
+            (set (make-local-variable 'orgmine-time-entry-activities) nil))
+          (unless orgmine-time-entry-activities
+            (setq orgmine-time-entry-activities
+                  (elmine/get-time-entry-activities)))
+          (let ((candidates
+                 (mapcar (lambda (activity)
+                           (cons (format "%s" (plist-get activity :name))
+                                 (let ((id (plist-get activity :id)))
+                                   (if (stringp id)
+                                       (string-to-number id)
+                                     id))))
+                         orgmine-time-entry-activities)))
+            (or (cdr (assoc value candidates))
+                (if promptp
+                    (let* ((choice (completing-read
+                                    "Time-entry activity: " candidates
+                                    nil t value))
+                           (activity (assoc choice candidates)))
+                      (if activity
+                          (cdr activity)
+                        (user-error "Unknown time-entry activity: %s" choice)))
+                  (user-error "No matching time-entry activity: %s" value))))))))
+
+(defun orgmine--push-time-entries (issue issue-id entries promptp)
+  (let* ((clocks (orgmine-parse-logbook-clocks issue))
+         (missing (orgmine-clocks-missing-remotely clocks entries))
+         (pushed 0))
+    (when missing
+      (let ((activity-id (orgmine--time-entry-activity-id
+                          (orgmine--time-entry-issue-begin issue) promptp)))
+        (mapc (lambda (clock)
+                (let* ((minutes (max 0 (or (nth 2 clock) 0)))
+                       (hours (max 0.01
+                                    (orgmine--time-entry-round-hours
+                                     (/ (float minutes) 60.0)))))
+                  (elmine/create-time-entry
+                   (list :issue_id issue-id
+                         :spent_on (orgmine--clock-start-date clock)
+                         :hours hours
+                         :activity_id activity-id
+                         :comments (orgmine--time-entry-comment
+                                    (nth 3 clock))))
+                  (setq pushed (1+ pushed))))
+              missing)))
+    (if (> pushed 0)
+        (list pushed
+              (orgmine--pull-time-entries
+               issue (elmine/get-issue-time-entries issue-id)))
+      (list 0 0))))
+
+(defun orgmine--time-entry-report (issue-id pulled pushed)
+  (message "#%s: pulled %d time %s, pushed %d"
+           issue-id pulled (if (= pulled 1) "entry" "entries") pushed))
+
+(defun orgmine-pull-time-entries ()
+  "Pull an issue's Redmine time entries into its own LOGBOOK."
+  (interactive)
+  (let* ((context (orgmine--time-entry-context))
+         (issue (nth 0 context))
+         (issue-id (nth 2 context))
+         (pulled (orgmine--pull-time-entries
+                  issue (elmine/get-issue-time-entries issue-id))))
+    (orgmine--time-entry-report issue-id pulled 0)
+    pulled))
+
+(defun orgmine-push-time-entries ()
+  "Push closed local clocks missing from an issue's Redmine time entries."
+  (interactive)
+  (let* ((context (orgmine--time-entry-context))
+         (issue (nth 0 context))
+         (issue-id (nth 2 context))
+         (result (orgmine--push-time-entries
+                  issue issue-id (elmine/get-issue-time-entries issue-id)
+                  (called-interactively-p 'interactive))))
+    (orgmine--time-entry-report issue-id (nth 1 result) (nth 0 result))
+    (nth 0 result)))
+
+(defun orgmine-sync-time-entries ()
+  "Pull and push time entries for the issue at or above point."
+  (interactive)
+  (let* ((context (orgmine--time-entry-context))
+         (issue (nth 0 context))
+         (issue-id (nth 2 context))
+         (entries (elmine/get-issue-time-entries issue-id))
+         (pulled (orgmine--pull-time-entries issue entries))
+         (result (orgmine--push-time-entries
+                  issue issue-id entries
+                  (called-interactively-p 'interactive)))
+         (pushed (nth 0 result)))
+    (setq pulled (+ pulled (nth 1 result)))
+    (orgmine--time-entry-report issue-id pulled pushed)
+    (list pulled pushed)))
+
+
 (defun orgmine-body-region ()
   "Returns the region from the beginning of body to the next headline
 as a cons cell (BEG . END)."
@@ -1802,21 +2182,31 @@ Will you force to update entry #%s? %s" id id plist))
 
 (defun orgmine-submit-issue-update (issue force &optional no-prompt)
   "Submit the issue update to Redmine."
-  (orgmine-submit-entry-update issue :id :subject
-			       'orgmine-get-issue
-			       (lambda (plist)
-				 (orgmine-submit-issue-relations plist)
-				 (let ((uploads
-					(orgmine-upload-attachents plist)))
-				   (if uploads
-				       (setq plist
-					     (plist-merge plist
-							  (list
-							   :uploads uploads
-							   :attachments nil)))))
-				 (elmine/update-issue plist)
-				 (orgmine-fetch-issue t))
-			       force no-prompt))
+  (let ((beg (copy-marker (org-element-property :begin issue))))
+    (prog1
+	(orgmine-submit-entry-update issue :id :subject
+				     'orgmine-get-issue
+				     (lambda (plist)
+				       (orgmine-submit-issue-relations plist)
+				       (let ((uploads
+					      (orgmine-upload-attachents plist)))
+					 (if uploads
+					     (setq plist
+						   (plist-merge plist
+								(list
+								 :uploads uploads
+								 :attachments nil)))))
+				       (elmine/update-issue plist)
+				       (orgmine-fetch-issue t))
+				     force no-prompt)
+      (when orgmine-sync-time-entries
+	(let* ((issue-id (orgmine-get-id beg))
+	       (result (orgmine--push-time-entries
+			(marker-position beg) issue-id
+			(elmine/get-issue-time-entries issue-id)
+			(not noninteractive))))
+	  (orgmine--time-entry-report issue-id (nth 1 result) (nth 0 result))))
+      (set-marker beg nil))))
 
 (defun orgmine-submit-version-update (version force &optional no-prompt)
   "Submit the version update to Redmine."
@@ -1967,23 +2357,35 @@ return the issue number of the current entry."
   "Update the entry of ISSUE (org-element data) per REDMINE-ISSUE.
 If the issue of Redmine is not updated since last sync and FORCE is nil,
 the entry is not updated."
-  (orgmine-update-entry
-   'issue issue redmine-issue force
-   '(id tracker created_on updated_on closed_on
-	parent status fixed_version ;; author
-	start_date due_date done_ratio
-	estimated_hours assigned_to author category
-        project custom_fields relations)
-   (lambda (plist beg end)
-     (let ((description (plist-get plist :description))
-	   (journals (plist-get plist :journals))
-	   (attachments (plist-get plist :attachments)))
-       ;; update journals
-       (if journals (orgmine-insert-journals journals beg end))
-       ;; update attachments
-       (if attachments (orgmine-insert-attachments attachments beg end))
-       ;; update entry description
-       (if description (orgmine-insert-description description beg end))))))
+  (let ((beg (copy-marker (org-element-property :begin issue))))
+    (prog1
+	(orgmine-update-entry
+	 'issue issue redmine-issue force
+	 '(id tracker created_on updated_on closed_on
+	      parent status fixed_version ;; author
+	      start_date due_date done_ratio
+	      estimated_hours assigned_to author category
+	      project custom_fields relations)
+	 (lambda (plist beg end)
+	   (let ((description (plist-get plist :description))
+		 (journals (plist-get plist :journals))
+		 (attachments (plist-get plist :attachments)))
+	     ;; update journals
+	     (if journals (orgmine-insert-journals journals beg end))
+	     ;; update attachments
+	     (if attachments (orgmine-insert-attachments attachments beg end))
+	     ;; update entry description
+	     (if description (orgmine-insert-description description beg end)))))
+      ;; Logging time does not touch the issue's updated_on, so pull time
+      ;; entries even when the entry itself was up to date.
+      (when orgmine-sync-time-entries
+	(let ((issue-id (plist-get redmine-issue :id)))
+	  (orgmine--time-entry-report
+	   issue-id
+	   (orgmine--pull-time-entries
+	    (marker-position beg) (elmine/get-issue-time-entries issue-id))
+	   0)))
+      (set-marker beg nil))))
 
 (defun orgmine-update-version (version redmine-version &optional force)
   "Update the entry of VERSION (org-element data) per REDMINE-VERSION.
