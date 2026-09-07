@@ -86,6 +86,13 @@
   (should (equal (orgmine-idname-to-id "24") "24"))
   (should (equal (orgmine-idname-to-id "84:MyProject") "84")))
 
+(ert-deftest orgmine-test-parse-issue-url ()
+  "Test parsing a Redmine issue URL into server and issue ID."
+  (let ((orgmine-servers '(("redmine" (host . "http://redmine.example.com")))))
+    (should (equal (orgmine-parse-issue-url "http://redmine.example.com/issues/24")
+                   '("redmine" . "24")))
+    (should-not (orgmine-parse-issue-url "http://other.example.com/issues/24"))))
+
 (ert-deftest orgmine-test-redmine-date-conversion ()
   "Test parsing org-mode timestamp to redmine date."
   (should (equal (orgmine-redmine-date "[2015-09-04 Fri]") "2015-09-04")))
@@ -183,6 +190,16 @@
       (should (search-forward new-desc end t))
       (goto-char beg)
       (should-not (search-forward "This is a hard part." end t)))))
+
+(ert-deftest orgmine-test-no-such-resource-error ()
+  "Signal `no-such-resource' for a 404 response."
+  (let ((orgmine-host "http://redmine.example.com")
+        (orgmine-api-key "test-key"))
+    (cl-letf (((symbol-function 'request)
+               (lambda (&rest _args)
+                 (make-request-response :status-code 404))))
+      (should-error (orgmine/api-raw "GET" "/x.json" nil nil)
+                    :type 'no-such-resource))))
 
 (provide 'orgmine-tests)
 ;;; orgmine-tests.el ends here
