@@ -1,5 +1,6 @@
 ;;; orgmine-tests.el --- Tests for orgmine.el  -*- lexical-binding: t; -*-
 (require 'ert)
+(require 'cl-lib)
 (require 'orgmine)
 
 (defconst orgmine-test-sample-data
@@ -85,6 +86,11 @@
   (should (equal (orgmine-idname-to-id "1:SandBox") "1"))
   (should (equal (orgmine-idname-to-id "24") "24"))
   (should (equal (orgmine-idname-to-id "84:MyProject") "84")))
+
+(ert-deftest orgmine-test-api-plist-to-alist ()
+  "Test converting API plist parameters to an ordered alist without nils."
+  (should (equal (orgmine/api-plist-to-alist '(:a 1 :b nil :c "x"))
+                 '(("a" . 1) ("c" . "x")))))
 
 (ert-deftest orgmine-test-redmine-date-conversion ()
   "Test parsing org-mode timestamp to redmine date."
@@ -183,6 +189,24 @@
       (should (search-forward new-desc end t))
       (goto-char beg)
       (should-not (search-forward "This is a hard part." end t)))))
+
+(ert-deftest orgmine-test-api-json-read-decodes-false-as-nil ()
+  "Test that request.el JSON parsing decodes false as nil."
+  (with-temp-buffer
+    (insert "{\"a\":false,\"b\":true}")
+    (goto-char (point-min))
+    (should (equal (orgmine/api-json-read) '(:a nil :b t)))))
+
+(ert-deftest orgmine-test-insert-todo-sequence-template ()
+  "Test separating open and closed issue statuses in the TODO sequence."
+  (cl-letf (((symbol-function 'elmine/get-issue-statuses)
+             (lambda () '((:id 1 :name "New" :is_closed nil)
+                          (:id 5 :name "Closed" :is_closed t)))))
+    (with-temp-buffer
+      (orgmine-insert-todo-sequence-template)
+      (should (string-match-p "^#\\+SEQ_TODO: New | Closed$"
+                              (buffer-substring-no-properties
+                               (point-min) (1- (point-max))))))))
 
 (provide 'orgmine-tests)
 ;;; orgmine-tests.el ends here

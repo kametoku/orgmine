@@ -197,7 +197,8 @@ Advance point just past JSON object."
   (json-skip-whitespace)
   (unless (eq (json-peek) :json-eof)
     (let ((json-object-type 'plist)
-          (json-array-type 'list))
+          (json-array-type 'list)
+          (json-false nil))
       (json-read))))
 
 (defun orgmine/api-decode (json-string)
@@ -226,9 +227,10 @@ arrays are going to be lists."
     (while plist
       (let ((key (elmine/ensure-string (car plist))) ; XXX
             (value (car (cdr plist))))
-        (push (cons key value) alist))
+        (unless (null value)
+          (push (cons key value) alist)))
       (setq plist (cdr (cdr plist))))
-    alist))
+    (nreverse alist)))
 
 (defun orgmine/api-raw (method path data params &optional content-type)
   "Perform a raw HTTP request with given METHOD, a relative PATH and a
@@ -3285,8 +3287,8 @@ Then entry could be an issue, version, tracker or project."
     (orgmine-insert-status-property-template)
     (orgmine-insert-tracker-property-template (string-to-number project))
     (orgmine-insert-assigned-to-property-template)
-    (insert "#+PROPERTY: om_done_ration_ALL "
-	    "0 10 20 30 40 50 60 70 80 90 100\n")
+    (insert "#+PROPERTY: om_done_ratio_ALL "
+            "0 10 20 30 40 50 60 70 80 90 100\n")
     (orgmine-insert-custom-fields-property-template project)))
 
 ;;;;
