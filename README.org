@@ -83,6 +83,7 @@ Prior to do this, please get the API key of the redmine REST API.
 | project-title-format | orgmine-project-title-format | Project title format    |
 | user-name-format     | orgmine-user-name-format     | User Name format        |
 | custom-fields        | NA                           | custom fields           |
+| status-keywords      | orgmine-status-keywords      | Status keyword mapping |
 
 ** A .org file at a glance
 
@@ -98,6 +99,18 @@ This is up to the statuses of the Redmine.
 #+begin_src org
   ,#+SEQ_TODO: New(n) Open(o) Resolved(r) Feedback(f) | Closed(c)
 #+end_src
+
+**** Status keyword mappings
+
+Use =orgmine-status-keyword-alist= to map Redmine status names to the Org
+TODO keywords used in your files:
+
+#+begin_src emacs-lisp
+  (setq orgmine-status-keyword-alist '(("New" . "TODO") ("In Progress" . "DOING") ("Closed" . "DONE")))
+#+end_src
+
+The =#+SEQ_TODO= line and =orgmine-insert-template= output use the mapped
+keywords.  Statuses not listed in the alist use the default derived keyword.
 
 *** #+TAGS settings
 

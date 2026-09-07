@@ -1,6 +1,7 @@
 ;;; orgmine-tests.el --- Tests for orgmine.el  -*- lexical-binding: t; -*-
 (require 'ert)
 (require 'orgmine)
+(require 'cl-lib)
 
 (defconst orgmine-test-sample-data
   "
@@ -183,6 +184,20 @@
       (should (search-forward new-desc end t))
       (goto-char beg)
       (should-not (search-forward "This is a hard part." end t)))))
+
+(ert-deftest orgmine-test-status-keyword-alist ()
+  "Test mapping Redmine status names to Org TODO keywords."
+  (let ((orgmine-status-keyword-alist '(("In Progress" . "DOING"))))
+    (should (equal (orgmine-todo-keyword "In Progress") "DOING"))
+    (should (equal (orgmine-todo-keyword "Feedback") "Feedback"))))
+
+(ert-deftest orgmine-test-issue-status-id-status-keyword-alist ()
+  "Test mapping an Org TODO keyword back to a Redmine status ID."
+  (let ((orgmine-status-keyword-alist '(("Closed" . "DONE"))))
+    (setq orgmine-statuses nil)
+    (cl-letf (((symbol-function 'elmine/get-issue-statuses)
+               (lambda () '((:id 5 :name "Closed")))))
+      (should (equal (orgmine-issue-status-id "DONE") 5)))))
 
 (provide 'orgmine-tests)
 ;;; orgmine-tests.el ends here
