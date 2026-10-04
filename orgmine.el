@@ -134,6 +134,12 @@
     (wiki . "wiki"))
   "Alist of tags which are used in orgmine mode."
   :group 'orgmine)
+(defcustom orgmine-status-keyword-alist nil
+  "Alist mapping Redmine status names to Org TODO keywords.
+Statuses not listed here use the derived keyword.  A server-specific
+`status-keywords' setting takes precedence over this alist."
+  :group 'orgmine
+  :type '(alist :key-type string :value-type string))
 
 (defvar orgmine-tag-update-me (cdr (assq 'update-me orgmine-tags)))
 (defvar orgmine-tag-create-me (cdr (assq 'create-me orgmine-tags)))
@@ -181,7 +187,9 @@
      (user-name-format . "%{firstname} %{lastname}")
      (default-todo-keyword . "New")))
   "An alist of redmine servers.
-Each element has the form (NAME CONFIGURATION)."
+Each element has the form (NAME CONFIGURATION).  The
+`default-todo-keyword' value must be an Org TODO keyword after status
+mapping."
   :group 'orgmine)
 
 (defcustom orgmine-setup-hook nil
@@ -514,10 +522,12 @@ whose host is BASE-URL."
 	    (set (make-local-variable symbol) value)))
 	orgmine-tags))
 
+(defvar orgmine-status-keywords nil)
+
 (defvar orgmine-valid-variables
   '(host api-key issue-title-format journal-title-format version-title-format
 	 tracker-title-format project-title-format wiki-page-title-format
-	 user-name-format custom-fields default-todo-keyword))
+	 user-name-format custom-fields default-todo-keyword status-keywords))
 
 (defun orgmine-setup ()
   "Setup buffer local variables from ORGMINE-SERVERS per om_server property."
@@ -1180,13 +1190,22 @@ Only the properties given by PROPERTY-LIST are retrieved."
 
 (defun orgmine-todo-keyword (name)
   "Convert Redmine a status name to orgmode todo keyword.
-Space characters and brackets are removed from the status name."
-  (replace-regexp-in-string "(.*)" ""
-                            (replace-regexp-in-string " " "" name)))
+Space characters and brackets are removed from the status name unless a
+mapping is configured in `orgmine-status-keywords' or
+`orgmine-status-keyword-alist'."
+  (let ((mapping (assoc name (or (bound-and-true-p orgmine-status-keywords)
+					 orgmine-status-keyword-alist))))
+    (if mapping
+	(cdr mapping)
+      (replace-regexp-in-string "(.*)" ""
+				(replace-regexp-in-string " " "" name)))))
 
 (defvar orgmine-statuses nil)
 
 (defun orgmine-issue-status-id (todo-keyword)
+  "Return the Redmine status ID corresponding to TODO-KEYWORD.
+If multiple statuses map to TODO-KEYWORD, the first status returned by
+Redmine is used."
   ;; orgmode todo-keyword -> redmine status id
   ;; TODO: cache statues
   (or orgmine-statuses (setq orgmine-statuses (elmine/get-issue-statuses)))
@@ -1235,6 +1254,7 @@ as a cons cell (BEG . END)."
   "Returns the default TODO keyword for the initial status of Redmine issue.
 The default TODO keyword can be specified by \"om_default_todo\" property,
 such as \"#+PROPERTY: om_default_todo NEW\".
+The configured value must be an Org TODO keyword after status mapping.
 If the property is not found, the first TODO keyword of `org-todo-keywords-1'
 is returned."
   (or (cdr (assoc-string "om_default_todo" org-keyword-properties))

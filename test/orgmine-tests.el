@@ -2,6 +2,7 @@
 (require 'ert)
 (require 'cl-lib)
 (require 'orgmine)
+(require 'cl-lib)
 
 (defconst orgmine-test-sample-data
   "
@@ -232,6 +233,19 @@
       (goto-char beg)
       (should-not (search-forward "This is a hard part." end t)))))
 
+(ert-deftest orgmine-test-status-keyword-alist ()
+  "Test mapping Redmine status names to Org TODO keywords."
+  (let ((orgmine-status-keyword-alist '(("In Progress" . "DOING"))))
+    (should (equal (orgmine-todo-keyword "In Progress") "DOING"))
+    (should (equal (orgmine-todo-keyword "Feedback") "Feedback"))))
+
+(ert-deftest orgmine-test-issue-status-id-status-keyword-alist ()
+  "Test mapping an Org TODO keyword back to a Redmine status ID."
+  (let ((orgmine-status-keyword-alist '(("Closed" . "DONE"))))
+    (setq orgmine-statuses nil)
+    (cl-letf (((symbol-function 'elmine/get-issue-statuses)
+               (lambda () '((:id 5 :name "Closed")))))
+      (should (equal (orgmine-issue-status-id "DONE") 5)))))
 (ert-deftest orgmine-test-api-json-read-decodes-false-as-nil ()
   "Test that request.el JSON parsing decodes false as nil."
   (with-temp-buffer
