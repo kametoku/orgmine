@@ -1,5 +1,6 @@
 ;;; orgmine-tests.el --- Tests for orgmine.el  -*- lexical-binding: t; -*-
 (require 'ert)
+(require 'cl-lib)
 (require 'orgmine)
 (require 'cl-lib)
 
@@ -81,11 +82,32 @@
      (goto-char (point-min))
      ,@body)))
 
+(ert-deftest orgmine-test-buffer-local-variable-defaults ()
+  "Global defaults remain available before orgmine-mode setup."
+  (with-temp-buffer
+    (should (equal orgmine-tag-project "project"))
+    (should (null orgmine-ignore-ids))
+    (let ((orgmine-tags '((project . "proj"))))
+      (orgmine-setup-tags)
+      (should (equal orgmine-tag-project "proj"))
+      (should (equal (default-value 'orgmine-tag-project) "project")))))
+
 (ert-deftest orgmine-test-idname-to-id ()
   "Test extracting ID from ID:NAME format."
   (should (equal (orgmine-idname-to-id "1:SandBox") "1"))
   (should (equal (orgmine-idname-to-id "24") "24"))
   (should (equal (orgmine-idname-to-id "84:MyProject") "84")))
+
+(ert-deftest orgmine-test-api-plist-to-alist ()
+  "Test converting API plist parameters to an ordered alist without nils."
+  (should (equal (orgmine/api-plist-to-alist '(:a 1 :b nil :c "x"))
+                 '(("a" . 1) ("c" . "x")))))
+(ert-deftest orgmine-test-parse-issue-url ()
+  "Test parsing a Redmine issue URL into server and issue ID."
+  (let ((orgmine-servers '(("redmine" (host . "http://redmine.example.com")))))
+    (should (equal (orgmine-parse-issue-url "http://redmine.example.com/issues/24")
+                   '("redmine" . "24")))
+    (should-not (orgmine-parse-issue-url "http://other.example.com/issues/24"))))
 
 (ert-deftest orgmine-test-redmine-date-conversion ()
   "Test parsing org-mode timestamp to redmine date."
@@ -132,6 +154,32 @@
     (org-back-to-heading t)
     (orgmine-update-title "[[redmine:issues/24][#24]] Updated Subject")
     (should (string-match-p "Updated Subject" (thing-at-point 'line)))))
+
+(ert-deftest orgmine-test-insert-project-before-first-heading ()
+  "Test inserting a project before the first headline."
+  (with-temp-buffer
+    (insert "#+PROPERTY: om_server redmine\n#+PROPERTY: om_project 2:X\n\n")
+    (org-mode)
+    (org-set-regexps-and-options)
+    (let ((orgmine-servers
+           '(("redmine"
+              (host . "http://redmine.example.com")
+              (api-key . "blabblabblab")))))
+      (orgmine-mode t)
+      (goto-char (point-max))
+      (cl-letf (((symbol-function 'orgmine-get-project)
+                 (lambda (&rest _)
+                   '(:id 2 :name "X" :identifier "x" :status 1
+                     :created_on "2026-01-01T00:00:00Z"
+                     :updated_on "2026-01-01T00:00:00Z"))))
+        (orgmine-insert-project "2"))
+      (goto-char (point-min))
+      (re-search-forward "^\\* ")
+      (org-back-to-heading t)
+      (should (member orgmine-tag-project (org-get-tags)))
+      (should (equal (orgmine-idname-to-id
+                      (org-entry-get (point) "om_project"))
+                     "2")))))
 
 (ert-deftest orgmine-test-set-properties ()
   "Test setting properties from Redmine plist."
@@ -198,6 +246,32 @@
     (cl-letf (((symbol-function 'elmine/get-issue-statuses)
                (lambda () '((:id 5 :name "Closed")))))
       (should (equal (orgmine-issue-status-id "DONE") 5)))))
+(ert-deftest orgmine-test-api-json-read-decodes-false-as-nil ()
+  "Test that request.el JSON parsing decodes false as nil."
+  (with-temp-buffer
+    (insert "{\"a\":false,\"b\":true}")
+    (goto-char (point-min))
+    (should (equal (orgmine/api-json-read) '(:a nil :b t)))))
+
+(ert-deftest orgmine-test-insert-todo-sequence-template ()
+  "Test separating open and closed issue statuses in the TODO sequence."
+  (cl-letf (((symbol-function 'elmine/get-issue-statuses)
+             (lambda () '((:id 1 :name "New" :is_closed nil)
+                          (:id 5 :name "Closed" :is_closed t)))))
+    (with-temp-buffer
+      (orgmine-insert-todo-sequence-template)
+      (should (string-match-p "^#\\+SEQ_TODO: New | Closed$"
+                              (buffer-substring-no-properties
+                               (point-min) (1- (point-max))))))))
+(ert-deftest orgmine-test-no-such-resource-error ()
+  "Signal `no-such-resource' for a 404 response."
+  (let ((orgmine-host "http://redmine.example.com")
+        (orgmine-api-key "test-key"))
+    (cl-letf (((symbol-function 'request)
+               (lambda (&rest _args)
+                 (make-request-response :status-code 404))))
+      (should-error (orgmine/api-raw "GET" "/x.json" nil nil)
+                    :type 'no-such-resource))))
 
 (provide 'orgmine-tests)
 ;;; orgmine-tests.el ends here
