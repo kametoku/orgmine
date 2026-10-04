@@ -91,6 +91,12 @@
   "Test converting API plist parameters to an ordered alist without nils."
   (should (equal (orgmine/api-plist-to-alist '(:a 1 :b nil :c "x"))
                  '(("a" . 1) ("c" . "x")))))
+(ert-deftest orgmine-test-parse-issue-url ()
+  "Test parsing a Redmine issue URL into server and issue ID."
+  (let ((orgmine-servers '(("redmine" (host . "http://redmine.example.com")))))
+    (should (equal (orgmine-parse-issue-url "http://redmine.example.com/issues/24")
+                   '("redmine" . "24")))
+    (should-not (orgmine-parse-issue-url "http://other.example.com/issues/24"))))
 
 (ert-deftest orgmine-test-redmine-date-conversion ()
   "Test parsing org-mode timestamp to redmine date."
@@ -207,6 +213,15 @@
       (should (string-match-p "^#\\+SEQ_TODO: New | Closed$"
                               (buffer-substring-no-properties
                                (point-min) (1- (point-max))))))))
+(ert-deftest orgmine-test-no-such-resource-error ()
+  "Signal `no-such-resource' for a 404 response."
+  (let ((orgmine-host "http://redmine.example.com")
+        (orgmine-api-key "test-key"))
+    (cl-letf (((symbol-function 'request)
+               (lambda (&rest _args)
+                 (make-request-response :status-code 404))))
+      (should-error (orgmine/api-raw "GET" "/x.json" nil nil)
+                    :type 'no-such-resource))))
 
 (provide 'orgmine-tests)
 ;;; orgmine-tests.el ends here
