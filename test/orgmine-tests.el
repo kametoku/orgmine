@@ -81,6 +81,16 @@
      (goto-char (point-min))
      ,@body)))
 
+(ert-deftest orgmine-test-buffer-local-variable-defaults ()
+  "Global defaults remain available before orgmine-mode setup."
+  (with-temp-buffer
+    (should (equal orgmine-tag-project "project"))
+    (should (null orgmine-ignore-ids))
+    (let ((orgmine-tags '((project . "proj"))))
+      (orgmine-setup-tags)
+      (should (equal orgmine-tag-project "proj"))
+      (should (equal (default-value 'orgmine-tag-project) "project")))))
+
 (ert-deftest orgmine-test-idname-to-id ()
   "Test extracting ID from ID:NAME format."
   (should (equal (orgmine-idname-to-id "1:SandBox") "1"))
@@ -143,6 +153,32 @@
     (org-back-to-heading t)
     (orgmine-update-title "[[redmine:issues/24][#24]] Updated Subject")
     (should (string-match-p "Updated Subject" (thing-at-point 'line)))))
+
+(ert-deftest orgmine-test-insert-project-before-first-heading ()
+  "Test inserting a project before the first headline."
+  (with-temp-buffer
+    (insert "#+PROPERTY: om_server redmine\n#+PROPERTY: om_project 2:X\n\n")
+    (org-mode)
+    (org-set-regexps-and-options)
+    (let ((orgmine-servers
+           '(("redmine"
+              (host . "http://redmine.example.com")
+              (api-key . "blabblabblab")))))
+      (orgmine-mode t)
+      (goto-char (point-max))
+      (cl-letf (((symbol-function 'orgmine-get-project)
+                 (lambda (&rest _)
+                   '(:id 2 :name "X" :identifier "x" :status 1
+                     :created_on "2026-01-01T00:00:00Z"
+                     :updated_on "2026-01-01T00:00:00Z"))))
+        (orgmine-insert-project "2"))
+      (goto-char (point-min))
+      (re-search-forward "^\\* ")
+      (org-back-to-heading t)
+      (should (member orgmine-tag-project (org-get-tags)))
+      (should (equal (orgmine-idname-to-id
+                      (org-entry-get (point) "om_project"))
+                     "2")))))
 
 (ert-deftest orgmine-test-set-properties ()
   "Test setting properties from Redmine plist."
